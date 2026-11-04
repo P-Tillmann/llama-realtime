@@ -504,7 +504,7 @@ struct clip_enc_state {
     std::vector<ggml_tensor *> k; // per layer [n_embd_kv, n_ctx]
     std::vector<ggml_tensor *> v;
 
-    // lfm3a: same order as list_enc_state_slots(), F32 [ne0, ne1], updated in place
+    // lfm3a, gemma4a: same order as list_enc_state_slots(), F32 [ne0, ne1], updated in place
     std::vector<ggml_tensor *> slots;
 
     // nemotron transcribe: the window's normalized log-mel, cache and FIFO rows in; its speaker rows and predictions out
