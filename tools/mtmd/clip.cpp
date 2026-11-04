@@ -5780,6 +5780,13 @@ void clip_enc_state_free(clip_enc_state * state) {
     delete state;
 }
 
+void clip_enc_state_reset(clip_enc_state * state) {
+    ggml_backend_buffer_clear(state->buf.get(), 0);
+    std::fill(state->slot_pos.begin(), state->slot_pos.end(), -1);
+    state->stem_tail.clear();
+    state->n_past = 0;
+}
+
 size_t clip_cbx_read_tensor(struct clip_ctx * ctx, const char * name, float * out, size_t n_max) {
     const auto & tensors = ctx->model.cbx_tensors;
     auto it = tensors.find(name);
