@@ -5629,7 +5629,7 @@ bool clip_image_batch_encode(clip_ctx * ctx, int n_threads, const clip_image_f32
     return clip_encode(ctx, &params);
 }
 
-// persisted state slots of the gen-audio decoders and the streaming audio encoders
+// persisted state slots of the gen-audio decoders
 static std::vector<c2w_state_slot> list_gen_state_slots(const clip_hparams & hparams, const clip_model & model) {
     switch (model.proj_type) {
         case PROJECTOR_TYPE_QWEN3TTS_GEN:  return list_c2w_state_slots(hparams, model);
@@ -5637,6 +5637,14 @@ static std::vector<c2w_state_slot> list_gen_state_slots(const clip_hparams & hpa
         case PROJECTOR_TYPE_POCKETTTS_GEN: return list_pockettts_state_slots(hparams, model);
         case PROJECTOR_TYPE_LFM3A_GEN:     return list_lfm3a_gen_state_slots(hparams, model);
         default:                           return {};
+    }
+}
+
+// persisted state slots of the streaming audio encoders, empty if the encoder has none
+static std::vector<c2w_state_slot> list_enc_state_slots(const clip_hparams & hparams, const clip_model & model) {
+    switch (model.proj_type) {
+        case PROJECTOR_TYPE_LFM3A:   return list_lfm3a_state_slots(hparams, model);
+        default:                     return {};
     }
 }
 
@@ -5699,9 +5707,9 @@ const std::map<std::string, clip_gen_voice> & clip_gen_get_voices(const clip_ctx
 
 clip_enc_state * clip_enc_state_init(clip_ctx * ctx, int32_t n_frames_max) {
     const auto & hparams = ctx->model.hparams;
-    if (ctx->proj_type() == PROJECTOR_TYPE_LFM3A) {
-        // downsampler context, short-conv taps and attention window, see list_lfm3a_state_slots()
-        const auto slots = list_lfm3a_state_slots(hparams, ctx->model);
+    // downsampler context, short-conv taps and attention window, see list_enc_state_slots()
+    const auto slots = list_enc_state_slots(hparams, ctx->model);
+    if (!slots.empty()) {
         auto st = std::make_unique<clip_enc_state>();
         ggml_init_params params = {
             /*.mem_size   =*/ ggml_tensor_overhead() * slots.size(),
@@ -7822,10 +7830,10 @@ bool clip_encode(struct clip_ctx * ctx, struct clip_encode_params * params) {
             }
         }
     }
-    if (params->enc_state != nullptr && model.proj_type == PROJECTOR_TYPE_LFM3A) {
+    if (params->enc_state != nullptr && !params->enc_state->slots.empty()) {
         const auto & slots = params->enc_state->slots;
         size_t i = 0;
-        for (const auto & slot : list_lfm3a_state_slots(hparams, model)) {
+        for (const auto & slot : list_enc_state_slots(hparams, model)) {
             ggml_tensor * t = ggml_graph_get_tensor(gf, ("state_out_" + slot.name).c_str());
             GGML_ASSERT(t != nullptr);
             copy_gen_state_out(t, slots[i++]);
