@@ -118,10 +118,31 @@ async def run_scenario(sc: dict, target: str, url: str, model: str, timeout: flo
             "status": status, "error": error, "log": s.events}
 
 
+def item_ids(s: "Session") -> list:
+    """Ids of the conversation items in the order the server added them."""
+    ids = []
+    for e in s.events:
+        ev = e.get("event", {})
+        if ev.get("type") == "conversation.item.added" and ev["item"]["id"] not in ids:
+            ids.append(ev["item"]["id"])
+    return ids
+
+
+def resolve(obj, s: "Session"):
+    """Replaces "$item[i]" strings by the id of the i-th conversation item (negative i counts from the end)."""
+    if isinstance(obj, dict):
+        return {k: resolve(v, s) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [resolve(v, s) for v in obj]
+    if isinstance(obj, str) and obj.startswith("$item[") and obj.endswith("]"):
+        return item_ids(s)[int(obj[6:-1])]
+    return obj
+
+
 async def run_step(s: Session, step: dict, state: dict, timeout: float):
     kind = step["do"]
     if kind == "send":
-        await s.send(step["event"])
+        await s.send(resolve(step["event"], s))
     elif kind == "audio":
         pcm = load_pcm16(step["file"], state["rate"])
         silence = b"\0\0" * int(state["rate"] * step.get("silence_after_ms", 0) / 1000)

@@ -1,6 +1,6 @@
 """Scripted realtime sessions. Each scenario is a list of steps:
 
-  {"do": "send", "event": {...}}                       send a client event
+  {"do": "send", "event": {...}}                       send a client event ("$item[i]": id of the i-th conversation item)
   {"do": "audio", "file": "x.wav", ...}                 append a WAV (resampled to the session rate), 100 ms chunks
   {"do": "wait", "for": "response.done"}                wait for a server event type (or a list of types)
   {"do": "tool_output", "output": "..."}                answer the last function call
@@ -101,5 +101,59 @@ SCENARIOS = [
                       "transcription": {"model": "gpt-4o-mini-transcribe", "language": "en"}},
                       "output": {"voice": "marin"}}, max_output_tokens=200),
                   WAIT_UPDATED],
+    },
+    {
+        "name": "item_delete",
+        "phase": "P3",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  user_text("My name is Peter."), CREATE, WAIT_DONE,
+                  user_text("Actually, my name is Anna."), CREATE, WAIT_DONE,
+                  {"do": "send", "event": {"type": "conversation.item.delete", "item_id": "$item[2]"}},
+                  {"do": "wait", "for": "conversation.item.deleted"},
+                  {"do": "send", "event": {"type": "conversation.item.delete", "item_id": "$item[3]"}},
+                  {"do": "wait", "for": "conversation.item.deleted"},
+                  user_text("What is my name?"), CREATE, WAIT_DONE],
+    },
+    {
+        "name": "item_insert_retrieve",
+        "phase": "P3",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  user_text("My name is Peter."), CREATE, WAIT_DONE,
+                  {"do": "send", "event": {"type": "conversation.item.create", "previous_item_id": "$item[0]", "item": {
+                      "type": "message", "role": "user", "content": [{"type": "input_text", "text": "I am 42 years old."}]}}},
+                  {"do": "wait", "for": "conversation.item.done"},
+                  {"do": "send", "event": {"type": "conversation.item.retrieve", "item_id": "$item[-1]"}},
+                  {"do": "wait", "for": "conversation.item.retrieved"},
+                  user_text("How old am I?"), CREATE, WAIT_DONE],
+    },
+    {
+        "name": "audio_clear",
+        "phase": "P3",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  {"do": "audio", "file": "q_capital.wav"},
+                  {"do": "send", "event": {"type": "input_audio_buffer.clear"}},
+                  {"do": "wait", "for": "input_audio_buffer.cleared"},
+                  user_text("What is two plus two?"), CREATE, WAIT_DONE],
+    },
+    {
+        "name": "audio_truncate",
+        "phase": "P3",
+        "steps": [no_vad(output_modalities=["audio"]), WAIT_UPDATED,
+                  user_text("Tell me about Paris in two sentences."), CREATE, WAIT_DONE,
+                  {"do": "send", "event": {"type": "conversation.item.truncate", "item_id": "$item[1]", "content_index": 0,
+                                           "audio_end_ms": 1000}},
+                  {"do": "wait", "for": "conversation.item.truncated"},
+                  {"do": "send", "event": {"type": "conversation.item.retrieve", "item_id": "$item[1]"}},
+                  {"do": "wait", "for": "conversation.item.retrieved"}],
+    },
+    {
+        "name": "instructions_change",
+        "phase": "P3",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  user_text("My name is Peter."), CREATE, WAIT_DONE,
+                  {"do": "send", "event": {"type": "session.update", "session": {"type": "realtime",
+                      "instructions": "Answer in German, in one short sentence."}}},
+                  WAIT_UPDATED,
+                  user_text("What is my name?"), CREATE, WAIT_DONE],
     },
 ]
