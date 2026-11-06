@@ -1,5 +1,5 @@
 # Fork-only: records reference sessions from the OpenAI Realtime API into tools/realtime-harness/fixtures/openai
-# and commits them to the branch the workflow runs on. Needs the repository secret OPENAI_API_KEY.
+# and commits them to the branch the workflow runs on. Needs the repository secret OPEN_AI_KEY.
 name: Realtime - record OpenAI fixtures
 
 on:
@@ -40,7 +40,7 @@ jobs:
       - name: Record
         working-directory: tools/realtime-harness
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPEN_AI_KEY }}
           MODEL: ${{ inputs.model }}
           SCENARIOS: ${{ inputs.scenarios }}
         run: |
