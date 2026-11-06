@@ -68,7 +68,7 @@ class Session:
         await self.ws.send(json.dumps(ev))
 
     async def wait(self, types, timeout):
-        """Wait for one of the event types; errors end the wait too."""
+        """Wait for one of the event types; an error event ends the wait (and the scenario)."""
         types = {types} if isinstance(types, str) else set(types)
         deadline = time.monotonic() + timeout
         while True:
@@ -81,13 +81,19 @@ class Session:
                 raise TimeoutError(f"no {sorted(types)} within {timeout}s") from None
             if ev["type"] in types:
                 return ev
+            if ev["type"] == "error":
+                err = ev.get("error", {})
+                raise RuntimeError(f"error event while waiting for {sorted(types)}: {err.get('code') or err.get('type')}: {err.get('message')}")
 
 
 async def run_scenario(sc: dict, target: str, url: str, model: str, timeout: float) -> dict:
     headers = {}
     if target == "openai":
         url = f"wss://api.openai.com/v1/realtime?model={model}"
-        headers["Authorization"] = f"Bearer {os.environ.get('OPENAI_API_KEY', '')}"
+        key = os.environ.get("OPENAI_API_KEY", "")
+        if not key:
+            raise SystemExit("OPENAI_API_KEY is empty")
+        headers["Authorization"] = f"Bearer {key}"
     t0 = time.monotonic()
     proxy = None if target == "local" else True  # local server: never through an HTTPS proxy
     async with websockets.connect(url, additional_headers=headers, max_size=None, proxy=proxy) as ws:
@@ -142,6 +148,7 @@ async def record(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     names = args.scenario or [sc["name"] for sc in SCENARIOS]
+    failed = 0
     for sc in SCENARIOS:
         if sc["name"] not in names:
             continue
@@ -149,6 +156,8 @@ async def record(args):
         (out / f"{sc['name']}.json").write_text(json.dumps(res, indent=1, ensure_ascii=False) + "\n")
         n = sum(1 for e in res["log"] if "event" in e)
         print(f"{sc['name']:24s} {res['status']:6s} {n:4d} events  {res['error'] or ''}")
+        failed += res["status"] != "ok"
+    return failed
 
 
 def main():
@@ -161,13 +170,16 @@ def main():
     r.add_argument("--out", required=True)
     r.add_argument("--scenario", action="append", help="run only these (repeatable)")
     r.add_argument("--timeout", type=float, default=120)
+    r.add_argument("--strict", action="store_true", help="exit 1 if any scenario did not end ok")
     c = sub.add_parser("compare")
     c.add_argument("reference")
     c.add_argument("candidate")
     c.add_argument("--report")
     args = ap.parse_args()
     if args.cmd == "record":
-        asyncio.run(record(args))
+        failed = asyncio.run(record(args))
+        if args.strict and failed:
+            return 1
     else:
         from compare import compare_dirs
         report = compare_dirs(Path(args.reference), Path(args.candidate))

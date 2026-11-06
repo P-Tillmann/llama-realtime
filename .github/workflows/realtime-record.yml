@@ -44,10 +44,17 @@ jobs:
           MODEL: ${{ inputs.model }}
           SCENARIOS: ${{ inputs.scenarios }}
         run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::The repository secret OPEN_AI_KEY is missing or empty (Settings > Secrets and variables > Actions > Repository secrets)"
+            exit 1
+          fi
           args=()
           for s in $SCENARIOS; do args+=(--scenario "$s"); done
-          python harness.py record --target openai --model "$MODEL" --out fixtures/openai "${args[@]}" | tee record.log
+          set +e
+          python harness.py record --target openai --model "$MODEL" --out fixtures/openai --strict "${args[@]}" | tee record.log
+          rc=${PIPESTATUS[0]}
           { echo '```'; cat record.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: Commit fixtures
         run: |
