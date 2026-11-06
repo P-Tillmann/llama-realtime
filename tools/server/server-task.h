@@ -63,6 +63,8 @@ enum server_control_action {
     SERVER_CONTROL_ACTION_RESPONSE_CREATE, // generate after control_text, see control_response
     SERVER_CONTROL_ACTION_RESPONSE_CANCEL, // stop the response being generated
     SERVER_CONTROL_ACTION_CLEAR,           // drop the conversation
+    SERVER_CONTROL_ACTION_MARK,            // remember the conversation as it is, under the name control_text
+    SERVER_CONTROL_ACTION_ROLLBACK,        // go back to the mark control_text, later marks are dropped
 };
 
 // a response of a realtime conversation
