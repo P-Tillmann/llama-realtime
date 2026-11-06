@@ -559,7 +559,17 @@ struct server_task_result_realtime : server_task_result {
     std::vector<float> audio;               // PCM F32 at the sample rate of mtmd_gen_audio_get_info()
     bool               response_done = false;
     bool               cancelled     = false;
+    bool               truncated     = false; // stopped by the token limit or the context size
     int32_t            n_decoded     = 0;
+
+    // token counts of a response, set with response_done
+    int32_t n_input       = 0; // the conversation up to the response, its prompt included
+    int32_t n_input_audio = 0; // of which audio embeddings
+    int32_t n_cached      = 0; // of which already there at the end of the previous response
+    int32_t n_out_text    = 0;
+    int32_t n_out_audio   = 0; // audio frames
+    int32_t n_ctx         = 0;
+    int32_t n_past        = 0; // the conversation after the response
 
     virtual bool is_stop() override {
         return false; // the session ends when the client leaves, the task is cancelled then

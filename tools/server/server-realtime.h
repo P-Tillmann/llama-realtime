@@ -78,6 +78,13 @@ private:
     bool        cancelled  = false;
     int32_t     n_predict  = 0;
     int32_t     n_decoded  = 0;
+    int32_t     n_audio    = 0; // audio embeddings in the conversation
+    int32_t     n_prev_end = 0; // n_past at the end of the previous response
+    int32_t     n_input    = 0; // the conversation at the start of the response
+    int32_t     n_input_audio = 0;
+    int32_t     n_out_text    = 0;
+    int32_t     n_out_audio   = 0;
+    bool        truncated     = false;
     llama_token sampled    = LLAMA_TOKEN_NULL; // next text token of the response, sampled right after the slot's own decode
 
     mtmd::audio_stream_ptr stream;   // the audio of the open turn
