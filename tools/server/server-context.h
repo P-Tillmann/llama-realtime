@@ -124,6 +124,7 @@ struct server_routes {
     server_http_context::handler_t post_responses_tok_oai;
     server_http_context::handler_t post_transcriptions_oai;
     server_http_context::ws_handler_t ws_realtime;
+    std::function<bool(const std::vector<float> &, int, const std::string &, std::string &, int32_t &, int32_t &)> realtime_transcribe;
     server_http_context::handler_t post_anthropic_messages;
     server_http_context::handler_t post_anthropic_count_tokens;
     server_http_context::handler_t post_apply_template;

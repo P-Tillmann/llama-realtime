@@ -6158,6 +6158,66 @@ void server_routes::init_routes() {
             session);
     };
 
+    // transcription of the user audio of realtime conversations: a completion with the ASR prompt on a free slot,
+    // as /v1/audio/transcriptions does
+    this->realtime_transcribe = [this](const std::vector<float> & pcm, int rate, const std::string & language, std::string & text,
+                                       int32_t & n_input, int32_t & n_output) {
+        try {
+            // a 16-bit PCM WAV of the audio
+            raw_buffer wav;
+            auto put = [&wav](const void * p, size_t n) { wav.insert(wav.end(), (const uint8_t *) p, (const uint8_t *) p + n); };
+            const uint32_t data_sz = (uint32_t) pcm.size() * 2, riff_sz = 36 + data_sz, fmt_sz = 16, rate_u = rate, byte_rate = rate * 2;
+            const uint16_t pcm_fmt = 1, ch = 1, align = 2, bits = 16;
+            put("RIFF", 4); put(&riff_sz, 4); put("WAVE", 4); put("fmt ", 4); put(&fmt_sz, 4); put(&pcm_fmt, 2); put(&ch, 2);
+            put(&rate_u, 4); put(&byte_rate, 4); put(&align, 2); put(&bits, 2); put("data", 4); put(&data_sz, 4);
+            for (float x : pcm) {
+                const int16_t v = (int16_t) std::lround(std::max(-1.0f, std::min(1.0f, x)) * 32767.0f);
+                put(&v, 2);
+            }
+
+            std::map<std::string, uploaded_file> in_files;
+            in_files["file"].data = std::move(wav);
+            std::vector<raw_buffer> files;
+            json inp = json::object();
+            if (!language.empty()) {
+                inp["language"] = language;
+            }
+            json body = convert_transcriptions_to_chatcmpl(inp, meta->chat_params.tmpls.get(), in_files, files);
+            common_chat_session session;
+            json parsed = oaicompat_chat_params_parse(ctx_server.vocab, body, meta->chat_params, files, session);
+
+            server_response_reader rd(queue_tasks, queue_results, HTTP_POLLING_SECONDS);
+            server_task task(SERVER_TASK_TYPE_COMPLETION);
+            task.id     = rd.get_new_id();
+            task.tokens = process_mtmd_prompt(ctx_server.mctx, parsed.at("prompt").get<std::string>(), files, ctx_server.init_opt);
+            task.params = server_schema::eval_llama_cmpl_schema(ctx_server.vocab, params, meta->logit_bias_eog, parsed);
+            task.apply_chat_session(session);
+            task.params.res_type          = TASK_RESPONSE_TYPE_OAI_ASR;
+            task.params.oaicompat_cmpl_id = gen_chatcmplid();
+            task.params.oaicompat_model   = meta->model_name;
+            std::vector<server_task> tasks;
+            tasks.push_back(std::move(task));
+            rd.post_tasks(std::move(tasks), session);
+
+            auto all = rd.wait_for_all([]() { return false; });
+            auto * fin = all.results.empty() ? nullptr : dynamic_cast<server_task_result_cmpl_final *>(all.results[0].get());
+            if (all.is_terminated || !fin) {
+                return false;
+            }
+            text     = fin->content.text;
+            n_input  = fin->n_prompt_tokens;
+            n_output = fin->n_decoded;
+            while (!text.empty() && isspace((unsigned char) text.back())) {
+                text.pop_back();
+            }
+            text.erase(0, std::min(text.size(), text.find_first_not_of(" \n\t")));
+            return true;
+        } catch (const std::exception & e) {
+            SRV_WRN("realtime transcription failed: %s\n", e.what());
+            return false;
+        }
+    };
+
     // realtime transcription over websocket, modeled after the OpenAI realtime API
     // audio is PCM16 mono at the model sample rate, sent as base64 in input_audio_buffer.append events
     // input_audio_buffer.commit with "final": true ends the input, closing the socket also ends it
@@ -6183,7 +6243,8 @@ void server_routes::init_routes() {
         const bool live_asr = !ctx_server.asr_prompt.empty() && req.get_param("intent") == "transcription";
         if (ctx_server.mtmd_cap.audio_stream && ctx_server.mtmd_cap.chat && !live_asr) {
             server_realtime_conversation({queue_tasks, queue_results, *meta, params.sampling, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab,
-                                          ctx_server.vad_model, ctx_server.turn_model}, conn);
+                                          ctx_server.vad_model, ctx_server.turn_model,
+                                          meta->chat_params.allow_audio ? realtime_transcribe : nullptr}, conn);
             return;
         }
 
