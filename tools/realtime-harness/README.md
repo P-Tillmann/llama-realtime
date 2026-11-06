@@ -27,7 +27,7 @@ python harness.py record --target openai --model gpt-realtime --out fixtures/ope
 
 ## CI
 
-- `Realtime - record OpenAI fixtures` (manual): records the reference sessions and commits them. Needs the repository secret `OPEN_AI_KEY`.
+- `Realtime - record OpenAI fixtures` (manual): records the reference sessions and commits them. Needs the repository secret `OPENAI_API_KEY`.
 - `Realtime - conformance` (on push to `realtime`, `rt/**`, `up/**`): builds `llama-server`, runs all scenarios with LFM3-Audio-2B and puts the comparison in the job summary.
 
 Recorded logs keep every server event, except that base64 audio is replaced by its byte count.
