@@ -44,12 +44,12 @@ jobs:
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.24
         with:
-          key: realtime-conformance
+          key: realtime-conformance-portable
           evict-old-files: 1d
 
       - name: Build llama-server
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DGGML_NATIVE=OFF
           cmake --build build -j $(nproc) --target llama-server
 
       - name: Model cache
