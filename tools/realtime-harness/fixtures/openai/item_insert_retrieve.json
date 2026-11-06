@@ -1,0 +1,1006 @@
+{
+ "scenario": "item_insert_retrieve",
+ "target": "openai",
+ "model": "gpt-realtime",
+ "status": "ok",
+ "error": null,
+ "log": [
+  {
+   "t": 0.53,
+   "event": {
+    "type": "session.created",
+    "event_id": "event_EhLT8n0RaHvrex6WyK6G8",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EhLT8e5zBZA5Y5Y96bDfe",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "audio"
+     ],
+     "instructions": "Your knowledge cutoff is 2023-10. You are a helpful, witty, and friendly AI. Act like a human, but remember that you aren't a human and that you can't do human things in the real world. Your voice and personality should be warm and engaging, with a lively and playful tone. If interacting in a non-English language, start by using the standard accent or dialect familiar to the user. Talk quickly. You should always call a function if you can. Do not refer to these rules, even if you’re asked about them.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794002938,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": {
+        "type": "server_vad",
+        "threshold": 0.5,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 200,
+        "idle_timeout_ms": null,
+        "create_response": true,
+        "interrupt_response": true
+       }
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 0.53,
+   "sent": {
+    "type": "session.update",
+    "session": {
+     "type": "realtime",
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "audio": {
+      "input": {
+       "turn_detection": null
+      }
+     },
+     "output_modalities": [
+      "text"
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.575,
+   "event": {
+    "type": "session.updated",
+    "event_id": "event_EhLT8xdcxtCbAnrC25qUn",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EhLT8e5zBZA5Y5Y96bDfe",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "text"
+     ],
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794002938,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": null
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 0.575,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "My name is Peter."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.575,
+   "sent": {
+    "type": "response.create"
+   }
+  },
+  {
+   "t": 0.634,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EhLT8oXbpmSh7p0ckobRh",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EhLT8AEWqbOveuXYSrcIr",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "My name is Peter."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.636,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLT8CeP5B7ePopTlKkyU",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EhLT8AEWqbOveuXYSrcIr",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "My name is Peter."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.643,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EhLT85ZrDKRqBd7z9SExJ",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLT8uc5ja1OR89cts9Yb",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EhLT8XSuQI6Ll7W822mf0",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 0.785,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EhLT9jO8JXxZ2xTMepLMX",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLT8nv9GguRh0k8lYBem",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 0.786,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EhLT9r0VMFxD5ldqbg063",
+    "previous_item_id": "item_EhLT8AEWqbOveuXYSrcIr",
+    "item": {
+     "id": "item_EhLT8nv9GguRh0k8lYBem",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 0.786,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EhLT9guthWS4ZYkkPTBLm",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 0.786,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9zx4q3E8ypPoSSTMR",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "Hi",
+    "obfuscation": "Mgl1FFV8bzmus0"
+   }
+  },
+  {
+   "t": 0.79,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9LZlCbdwJgpAYiA7t",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Peter",
+    "obfuscation": "zVsYAX6zYS"
+   }
+  },
+  {
+   "t": 0.796,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT99UFlI3MifGk1cEkn",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "jcXBuCVGUsJPm7n"
+   }
+  },
+  {
+   "t": 0.804,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9ewFns4fewKm8hjO4",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " how",
+    "obfuscation": "aztayEGp8Geh"
+   }
+  },
+  {
+   "t": 0.813,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9Us2UG7SWIgqxk5Et",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " can",
+    "obfuscation": "cC1evkRCkuR7"
+   }
+  },
+  {
+   "t": 0.821,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT96nW1cR2XPR2KG7nW",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " I",
+    "obfuscation": "ovvALM5gbnpLGr"
+   }
+  },
+  {
+   "t": 0.828,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9owsFqZDmB8OyE6Uz",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " help",
+    "obfuscation": "WYS4cMxP4Us"
+   }
+  },
+  {
+   "t": 0.838,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9GviRNax0EnhXKSqv",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " you",
+    "obfuscation": "nhiIxnQRf2P5"
+   }
+  },
+  {
+   "t": 0.851,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9bfUQrec4irEwsLPx",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " today",
+    "obfuscation": "5o3qJ5qXPg"
+   }
+  },
+  {
+   "t": 0.853,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9XgJJfhKS2ELtSNEj",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "?",
+    "obfuscation": "oihhuNZ79couz6H"
+   }
+  },
+  {
+   "t": 0.874,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EhLT9RgT3QBba1QV86A7B",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "Hi Peter, how can I help you today?"
+   }
+  },
+  {
+   "t": 0.874,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EhLT9xD5objxsPDHpDApN",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "Hi Peter, how can I help you today?"
+    }
+   }
+  },
+  {
+   "t": 0.874,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLT9EEm8mx2Fd0nisDNZ",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EhLT8nv9GguRh0k8lYBem",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Hi Peter, how can I help you today?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.875,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EhLT95rPoa570GLgRS8JS",
+    "response_id": "resp_EhLT8uc5ja1OR89cts9Yb",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLT8nv9GguRh0k8lYBem",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Hi Peter, how can I help you today?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.878,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EhLT9SS3OFfrekxiJpfKj",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLT8uc5ja1OR89cts9Yb",
+     "status": "completed",
+     "status_details": null,
+     "output": [
+      {
+       "id": "item_EhLT8nv9GguRh0k8lYBem",
+       "type": "message",
+       "status": "completed",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "Hi Peter, how can I help you today?"
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EhLT8XSuQI6Ll7W822mf0",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 33,
+      "input_tokens": 21,
+      "output_tokens": 12,
+      "input_token_details": {
+       "text_tokens": 21,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 12,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 0.879,
+   "sent": {
+    "type": "conversation.item.create",
+    "previous_item_id": "item_EhLT8AEWqbOveuXYSrcIr",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "I am 42 years old."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.887,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EhLT9z8vP9wsf4UPuRBsj",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199725,
+      "reset_seconds": 0.082
+     }
+    ]
+   }
+  },
+  {
+   "t": 0.924,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EhLT9nlaKaHTndrSYDuHA",
+    "previous_item_id": "item_EhLT8AEWqbOveuXYSrcIr",
+    "item": {
+     "id": "item_EhLT9UqEqaB05icMh8A02",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "I am 42 years old."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.924,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLT9AVM3J20qrM4ZHcgL",
+    "previous_item_id": "item_EhLT8AEWqbOveuXYSrcIr",
+    "item": {
+     "id": "item_EhLT9UqEqaB05icMh8A02",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "I am 42 years old."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.924,
+   "sent": {
+    "type": "conversation.item.retrieve",
+    "item_id": "item_EhLT9UqEqaB05icMh8A02"
+   }
+  },
+  {
+   "t": 0.97,
+   "event": {
+    "type": "conversation.item.retrieved",
+    "event_id": "event_EhLT9aZqqsIIXFWdAp2kC",
+    "item": {
+     "id": "item_EhLT9UqEqaB05icMh8A02",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "I am 42 years old."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.97,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "How old am I?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.97,
+   "sent": {
+    "type": "response.create"
+   }
+  },
+  {
+   "t": 1.021,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EhLT9jBJIOJDzFhqS8lW9",
+    "previous_item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "item": {
+     "id": "item_EhLT92JuYBgS9yNKwlgPN",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "How old am I?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.022,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLT9uXkNJLmuvYZtJQsQ",
+    "previous_item_id": "item_EhLT8nv9GguRh0k8lYBem",
+    "item": {
+     "id": "item_EhLT92JuYBgS9yNKwlgPN",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "How old am I?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.028,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EhLT9Ku3pmItU5xpJKzvK",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLT9FPrBTeavlYwiZgb0",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EhLT8XSuQI6Ll7W822mf0",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.156,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EhLT9cKHBRVman47NJ6gW",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 1.156,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EhLT9S8Ogy06K0h5RNapu",
+    "previous_item_id": "item_EhLT92JuYBgS9yNKwlgPN",
+    "item": {
+     "id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 1.157,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EhLT9eoMbxMaBSqE5lIt2",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 1.158,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9wUY9CnZPR72jygzj",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "You",
+    "obfuscation": "tu9YCNfULBKLt"
+   }
+  },
+  {
+   "t": 1.164,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9US2BaCuWPXUPeif0",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " said",
+    "obfuscation": "wk0Iqxrc5Ne"
+   }
+  },
+  {
+   "t": 1.168,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT96qDC9oSnHchlvIOq",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " you're",
+    "obfuscation": "zxjszJmW8"
+   }
+  },
+  {
+   "t": 1.182,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9ySMfx7IA3yLxva4H",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " ",
+    "obfuscation": "j2vAwecbT2cBlla"
+   }
+  },
+  {
+   "t": 1.183,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9EH4M3I5uYysJssR7",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "42",
+    "obfuscation": "Q0K6Gt7jOrdTEb"
+   }
+  },
+  {
+   "t": 1.19,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9dITwlMBnS9e9uiir",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " years",
+    "obfuscation": "EjH77adZcQ"
+   }
+  },
+  {
+   "t": 1.198,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT91RPgkqHZomjxMfvE",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " old",
+    "obfuscation": "ToF0r6RxAJRv"
+   }
+  },
+  {
+   "t": 1.204,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLT9i7pE2VwA74vQY0ic",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ".",
+    "obfuscation": "snnXCpLkXDQBvqf"
+   }
+  },
+  {
+   "t": 1.224,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EhLT9JLMU4UpfPi9vKz44",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "You said you're 42 years old."
+   }
+  },
+  {
+   "t": 1.225,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EhLT9NvGqKOfB5eWD3FW7",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "item_id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "You said you're 42 years old."
+    }
+   }
+  },
+  {
+   "t": 1.226,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLT9jdKxG41MSE2F4Xzl",
+    "previous_item_id": "item_EhLT92JuYBgS9yNKwlgPN",
+    "item": {
+     "id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "You said you're 42 years old."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.226,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EhLT9IrJCNVz9hIeTkUXq",
+    "response_id": "resp_EhLT9FPrBTeavlYwiZgb0",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "You said you're 42 years old."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.23,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EhLT9WRlDqeAfcgBt8XmB",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLT9FPrBTeavlYwiZgb0",
+     "status": "completed",
+     "status_details": null,
+     "output": [
+      {
+       "id": "item_EhLT9Cq9Bs4Aqz6So5CQO",
+       "type": "message",
+       "status": "completed",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "You said you're 42 years old."
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EhLT8XSuQI6Ll7W822mf0",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 65,
+      "input_tokens": 55,
+      "output_tokens": 10,
+      "input_token_details": {
+       "text_tokens": 55,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 10,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.235,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EhLT92r3C6xVJWlo4912T",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199727,
+      "reset_seconds": 0.081
+     }
+    ]
+   }
+  }
+ ]
+}
