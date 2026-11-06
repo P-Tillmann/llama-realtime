@@ -442,6 +442,17 @@ struct realtime_conversation {
     std::vector<float> pending_pcm;    // audio of the uncommitted buffer, at the model rate
     std::string resp_mark;             // mark and turn state at the start of the response in progress
     turn_state  resp_before;
+    bool        resp_oob = false;      // conversation "none": the response stays out of the conversation (guarded by mutex)
+
+    // a response with its own context (input, instructions or tools of the response): the conversation is put back
+    // when it is done, client events wait until then
+    bool                             pending_restore = false;
+    std::string                      restore_mark;
+    turn_state                       restore_before;
+    std::string                      saved_instructions;
+    std::vector<common_chat_tool>    saved_tools;
+    json                             saved_tools_json;
+    std::deque<std::string>          held_events;
 
     // the item or response the results belong to, shared with the result loop
     std::mutex  mutex;
@@ -465,6 +476,8 @@ struct realtime_conversation {
     std::optional<task_result_state> parse; // the tool call parser, with tools
 
     std::atomic<bool> closed{false};
+
+    std::vector<std::thread> transcribers; // transcription of user audio, joined at the end of the session
 
     realtime_conversation(const server_realtime_deps & deps, server_http_context::ws_conn & conn) : deps(deps), conn(conn) {}
 
@@ -773,7 +786,7 @@ struct realtime_conversation {
                 content += json_value(part, "text", json_value(part, "transcript", std::string()));
             }
         }
-        const std::string text = (turn_open ? user_footer : "") + render_assistant(content, calls);
+        const std::string text = (turn_open ? user_footer : tool_results ? "" : next_header) + render_assistant(content, calls);
         if (!control(SERVER_CONTROL_ACTION_TEXT_APPEND, text)) {
             return false;
         }
@@ -927,8 +940,43 @@ struct realtime_conversation {
             const json prev = last_item_id.empty() ? json(nullptr) : json(last_item_id);
             send_event({{"type", "input_audio_buffer.committed"}, {"previous_item_id", prev}, {"item_id", it.id}});
         }
+        const std::string id = it.id;
+        std::vector<float> pcm = it.pcm;
         add_item(std::move(it));
+        transcribe_item(id, std::move(pcm));
         return true;
+    }
+
+    // audio.input.transcription: the user audio is transcribed on another slot, the conversation does not wait for it
+    void transcribe_item(const std::string & id, std::vector<float> pcm) {
+        if (type != "realtime" || transcription.is_null() || !deps.transcribe) {
+            return;
+        }
+        const std::string lang = json_value(transcription, "language", std::string());
+        transcribers.emplace_back([this, id, lang, pcm = std::move(pcm)]() {
+            std::string text;
+            int32_t n_in = 0, n_out = 0;
+            const bool ok = deps.transcribe(pcm, model_in_rate, lang, text, n_in, n_out);
+            if (closed) {
+                return;
+            }
+            std::lock_guard<std::mutex> lock(mutex);
+            if (!ok) {
+                send_event({{"type", "conversation.item.input_audio_transcription.failed"}, {"item_id", id}, {"content_index", 0},
+                            {"error", {{"type", "transcription_error"}, {"code", nullptr}, {"message", "transcription failed"}, {"param", nullptr}}}});
+                return;
+            }
+            const int i = find_item(id);
+            if (i >= 0) {
+                items[i].item["content"][0]["transcript"] = text;
+            }
+            send_event({{"type", "conversation.item.input_audio_transcription.delta"}, {"item_id", id}, {"content_index", 0}, {"delta", text}});
+            // the audio embeddings of the prompt are not counted apart, the text of the ASR prompt is small
+            send_event({{"type", "conversation.item.input_audio_transcription.completed"}, {"item_id", id}, {"content_index", 0},
+                        {"transcript", text},
+                        {"usage", {{"type", "tokens"}, {"total_tokens", n_in + n_out}, {"input_tokens", n_in}, {"output_tokens", n_out},
+                                   {"input_token_details", {{"text_tokens", 0}, {"audio_tokens", n_in}}}}}});
+        });
     }
 
     void on_commit() {
@@ -1004,6 +1052,11 @@ struct realtime_conversation {
             load_turn(before);
         }
         change(tail);
+        return put_items(tail, true);
+    }
+
+    // puts items in order, a response as one assistant turn; keep: they become the items of the conversation
+    bool put_items(std::vector<conv_item> & tail, bool keep) {
         for (size_t i = 0; i < tail.size(); ) {
             if (tail[i].kind == conv_item::ASSISTANT) {
                 std::vector<conv_item> group;
@@ -1016,7 +1069,9 @@ struct realtime_conversation {
                     return false;
                 }
                 for (auto & it : group) {
-                    add_item(std::move(it), false);
+                    if (keep) {
+                        add_item(std::move(it), false);
+                    }
                 }
                 continue;
             }
@@ -1024,9 +1079,34 @@ struct realtime_conversation {
                 send_error("failed to rebuild the conversation", "server_error");
                 return false;
             }
-            add_item(std::move(tail[i++]), false);
+            if (keep) {
+                add_item(std::move(tail[i]), false);
+            }
+            i++;
         }
         return true;
+    }
+
+    // after a response with its own context: the session instructions and tools, the conversation as it is
+    void restore_conversation() {
+        pending_restore = false;
+        instructions = saved_instructions;
+        tools        = saved_tools;
+        tools_json   = saved_tools_json;
+        configure();
+        if (!control(SERVER_CONTROL_ACTION_ROLLBACK, restore_mark)) {
+            send_error("failed to restore the conversation", "server_error");
+            return;
+        }
+        load_turn(restore_before);
+        std::vector<conv_item> all;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            all = std::move(items);
+            items.clear();
+            last_item_id.clear();
+        }
+        put_items(all, true);
     }
 
     void on_item_retrieve(const json & ev) {
@@ -1268,7 +1348,12 @@ struct realtime_conversation {
             return;
         }
         if (put_item(it)) {
+            const std::string id = it.id;
+            std::vector<float> pcm = it.kind == conv_item::USER_AUDIO ? it.pcm : std::vector<float>();
             add_item(std::move(it));
+            if (!pcm.empty()) {
+                transcribe_item(id, std::move(pcm));
+            }
         }
     }
 
@@ -1283,17 +1368,116 @@ struct realtime_conversation {
         }
     }
 
+    // the context of a response with its own input, instructions or tools: the conversation (or the input items) from
+    // the start, rendered with them; restore_conversation() puts the conversation back once the response is done
+    bool put_response_context(const json & resp, bool has_input, const std::string & instr,
+                              const std::vector<common_chat_tool> & new_tools, const json & new_tools_json) {
+        if (!can_edit("response.create")) {
+            return false;
+        }
+        std::vector<conv_item> ctx_items;
+        turn_state             start = save_turn();
+        std::string            first_mark;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (!items.empty()) {
+                start      = items[0].before;
+                first_mark = items[0].mark;
+            }
+            if (!has_input) {
+                ctx_items = items;
+            }
+        }
+        if (has_input) {
+            for (const auto & in : resp["input"]) {
+                if (json_value(in, "type", std::string()) == "item_reference") {
+                    std::lock_guard<std::mutex> lock(mutex);
+                    const int i = find_item(json_value(in, "id", std::string()));
+                    if (i < 0) {
+                        send_error("response.create: no item " + json_value(in, "id", std::string()));
+                        return false;
+                    }
+                    ctx_items.push_back(items[i]);
+                    ctx_items.back().response_id += "_ref"; // a referenced response item goes in on its own
+                    continue;
+                }
+                conv_item it;
+                std::string err;
+                if (!parse_client_item(in, it, err)) {
+                    send_error("response.create: input: " + err);
+                    return false;
+                }
+                ctx_items.push_back(std::move(it));
+            }
+        }
+
+        saved_instructions = instructions;
+        saved_tools        = tools;
+        saved_tools_json   = tools_json;
+        instructions = instr;
+        tools        = new_tools;
+        tools_json   = new_tools_json;
+        if (!configure()) {
+            instructions = saved_instructions;
+            tools        = saved_tools;
+            tools_json   = saved_tools_json;
+            send_error("the chat template does not fit the realtime turn format", "server_error");
+            return false;
+        }
+        if (!first_mark.empty() && !control(SERVER_CONTROL_ACTION_ROLLBACK, first_mark)) {
+            send_error("failed to go back in the conversation", "server_error");
+            return false;
+        }
+        restore_mark   = "base" + std::to_string(n_marks++);
+        restore_before = start;
+        if (!control(SERVER_CONTROL_ACTION_MARK, restore_mark)) {
+            return false;
+        }
+        pending_restore = true;
+        load_turn(start);
+        if (!put_items(ctx_items, false)) {
+            return false;
+        }
+        // a response needs a user turn or tool results before it
+        return turn_open || tool_results || ensure_turn();
+    }
+
     void on_response_create(const json & ev) {
         if (type == "transcription") {
             send_error("response.create: not supported in a transcription session");
             return;
         }
-        if (!turn_open && !tool_results) {
+        const json resp = ev.value("response", json::object());
+        const std::string conversation = json_value(resp, "conversation", std::string("auto"));
+        if (conversation != "auto" && conversation != "none") {
+            send_error("response.create: conversation must be \"auto\" or \"none\"");
+            return;
+        }
+        const bool oob = conversation == "none";
+
+        // input, instructions or tools of the response: it gets its own context
+        std::string resp_instructions = instructions;
+        if (resp.contains("instructions") && resp["instructions"].is_string()) {
+            resp_instructions = resp["instructions"];
+        }
+        std::vector<common_chat_tool> resp_tools = tools;
+        json resp_tools_json = tools_json;
+        if (resp.contains("tools") && resp["tools"] != tools_json) {
+            std::string err;
+            if (!parse_tools(resp["tools"], resp_tools, err)) {
+                send_error("response.create: " + err);
+                return;
+            }
+            resp_tools_json = resp["tools"];
+        }
+        const bool has_input = resp.contains("input") && resp["input"].is_array();
+        const bool fresh     = has_input || resp_instructions != instructions || resp_tools_json != tools_json;
+
+        if (!fresh && n_turns == 0 && !turn_open && !tool_results) {
             send_error("response.create: commit audio or create a message first", "conversation_empty");
             return;
         }
         mtmd_helper_gen_audio_out_mode mode = out_mode;
-        const json resp = ev.value("response", json::object());
         if (resp.contains("output_modalities")) {
             std::string err;
             if (!parse_output_modalities(resp["output_modalities"], mode, err)) {
@@ -1313,6 +1497,9 @@ struct realtime_conversation {
         if (has_audio && !commit()) {
             return;
         }
+        if (fresh && !put_response_context(resp, has_input, resp_instructions, resp_tools, resp_tools_json)) {
+            return;
+        }
 
         common_chat_tool_choice choice = tool_choice;
         if (resp.contains("tool_choice")) {
@@ -1324,7 +1511,8 @@ struct realtime_conversation {
         }
 
         // the gen-audio pipeline opens the response in the asked mode, after tool results the assistant turn opens right away
-        const std::string prompt = (turn_open ? user_footer : "") + assistant_header;
+        // after a response without new input, the assistant turn follows the previous one
+        const std::string prompt = (turn_open ? user_footer : tool_results ? "" : next_header) + assistant_header;
         server_control_response response;
         response.n_predict = max_output_tokens;
         if (resp.contains("max_output_tokens") && !parse_max_output_tokens(resp["max_output_tokens"], response.n_predict)) {
@@ -1376,8 +1564,9 @@ struct realtime_conversation {
                 parse.emplace(std::move(*chat));
             }
             out_rs.reset(model_out_rate, out_fmt.rate);
+            resp_oob      = oob;
             response_meta = {
-                {"conversation_id",   conv_id},
+                {"conversation_id",   oob ? json(nullptr) : json(conv_id)},
                 {"output_modalities", output_modalities_json(mode)},
                 {"max_output_tokens", max_output_tokens_json(response.n_predict)},
                 {"metadata",          resp.value("metadata", json(nullptr))},
@@ -1398,6 +1587,12 @@ struct realtime_conversation {
         responding = true;
         if (!control(SERVER_CONTROL_ACTION_RESPONSE_CREATE, prompt, {}, response)) {
             responding = false;
+            return;
+        }
+        if (oob && !fresh) {
+            // out of the conversation: back to the mark once the response is done, the slot runs the controls in order
+            control(SERVER_CONTROL_ACTION_ROLLBACK, resp_mark);
+            load_turn(resp_before);
             return;
         }
         // the response ends the turn, its tokens are in the slot; the footer goes in before the next turn
@@ -1575,6 +1770,20 @@ struct realtime_conversation {
             return;
         }
         const std::string t = json_value(ev, "type", std::string());
+        if (pending_restore) {
+            if (responding && t != "response.cancel") {
+                held_events.push_back(msg); // runs on the conversation once it is back
+                return;
+            }
+            if (!responding) {
+                restore_conversation();
+                std::deque<std::string> held;
+                held.swap(held_events);
+                for (const auto & m : held) {
+                    handle(m);
+                }
+            }
+        }
         if (t == "session.update" || t == "transcription_session.update") {
             on_session_update(ev);
         } else if (t == "input_audio_buffer.append") {
@@ -1618,6 +1827,9 @@ struct realtime_conversation {
     void add_output_item(int idx) {
         send_event({{"type", "response.output_item.added"}, {"response_id", response_id}, {"output_index", idx},
                     {"item", output[idx]}});
+        if (resp_oob) {
+            return;
+        }
         const json prev = last_item_id.empty() ? json(nullptr) : json(last_item_id);
         send_event({{"type", "conversation.item.added"}, {"previous_item_id", prev}, {"item", output[idx]}});
         last_item_id = output[idx]["id"];
@@ -1811,9 +2023,13 @@ struct realtime_conversation {
         }
         for (size_t i = 0; i < output.size(); i++) {
             output[i]["status"] = status == "cancelled" ? "incomplete" : status;
+            // as OpenAI: an out-of-band item gets conversation.item.done (no added) and stays out of the conversation
             send_event({{"type", "conversation.item.done"}, {"previous_item_id", i > 0 ? output[i - 1]["id"] : json(nullptr)},
                         {"item", output[i]}});
             send_event({{"type", "response.output_item.done"}, {"response_id", response_id}, {"output_index", i}, {"item", output[i]}});
+            if (resp_oob) {
+                continue;
+            }
             // the response is in the conversation from its mark, its items go in together when it is rebuilt
             conv_item it;
             it.kind        = conv_item::ASSISTANT;
@@ -1916,6 +2132,9 @@ struct realtime_conversation {
         closed = true;
         conn.close();
         reader.join();
+        for (auto & t : transcribers) {
+            t.join();
+        }
     }
 };
 
