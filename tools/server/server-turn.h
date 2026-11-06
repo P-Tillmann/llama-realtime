@@ -47,6 +47,9 @@ struct server_turn_model {
     virtual float end_of_turn_prob(const float * pcm, size_t n) = 0;
 };
 
+// Smart Turn v3 (16 kHz), shared by the sessions (one inference at a time); null on error
+std::shared_ptr<server_turn_model> server_turn_model_load(const std::string & path, int n_threads);
+
 struct server_turn_action {
     enum kind_t { AUDIO, SPEECH_STARTED, SPEECH_STOPPED, IDLE_TIMEOUT } kind;
     int64_t            audio_ms = 0; // start (with the prefix padding) or end of speech, or the time of the timeout
