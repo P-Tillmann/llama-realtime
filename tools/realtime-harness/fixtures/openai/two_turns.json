@@ -1,0 +1,23 @@
+{
+ "scenario": "two_turns",
+ "target": "openai",
+ "model": "gpt-realtime",
+ "status": "failed",
+ "error": "TimeoutError: no ['session.created', 'transcription_session.created'] within 120s",
+ "log": [
+  {
+   "t": 0.239,
+   "event": {
+    "type": "error",
+    "event_id": "event_EhH3tR4qHkfqN7H80wAIp",
+    "error": {
+     "type": "invalid_request_error",
+     "code": "invalid_api_key",
+     "message": "Incorrect API key provided: ''. You can find your API key at https://platform.openai.com/account/api-keys.",
+     "param": null,
+     "event_id": null
+    }
+   }
+  }
+ ]
+}
