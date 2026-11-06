@@ -9,6 +9,7 @@
 #include "server-task.h"
 #include "server-queue.h"
 #include "server-realtime.h"
+#include "server-turn.h"
 #include "server-schema.h"
 #include "server-stream.h"
 
@@ -1034,6 +1035,9 @@ public:
     // prompt of the "asr" chat template, for live ASR
     llama_tokens asr_prompt;
 
+    // the VAD of realtime turn detection, shared by the sessions
+    std::shared_ptr<server_vad_model> vad_model;
+
     bool has_cap_tts() const {
         return mtmd_cap.audio_gen;
     }
@@ -1416,6 +1420,15 @@ private:
         }
 
         mtmd_cap = mtmd_helper_get_capabilities(model_tgt, mctx);
+
+        if (!params_base.vad_model.empty()) {
+            vad_model = server_vad_model_load(params_base.vad_model);
+            if (!vad_model) {
+                SRV_ERR("failed to load the VAD model %s\n", params_base.vad_model.c_str());
+                return false;
+            }
+            SRV_INF("loaded the VAD model %s\n", params_base.vad_model.c_str());
+        }
 
         if (!llama_memory_can_shift(llama_get_memory(ctx_tgt))) {
             if (params_base.ctx_shift) {
@@ -6160,7 +6173,8 @@ void server_routes::init_routes() {
         // live transcription: Voxtral Realtime (no chat), or an "asr" model in a session opened with ?intent=transcription
         const bool live_asr = !ctx_server.asr_prompt.empty() && req.get_param("intent") == "transcription";
         if (ctx_server.mtmd_cap.audio_stream && ctx_server.mtmd_cap.chat && !live_asr) {
-            server_realtime_conversation({queue_tasks, queue_results, *meta, params.sampling, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab}, conn);
+            server_realtime_conversation({queue_tasks, queue_results, *meta, params.sampling, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab,
+                                          ctx_server.vad_model}, conn);
             return;
         }
 
