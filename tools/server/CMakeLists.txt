@@ -19,6 +19,8 @@ add_library(${TARGET} STATIC
     server-context.h
     server-realtime.cpp
     server-realtime.h
+    server-turn.cpp
+    server-turn.h
     server-stream.cpp
     server-stream.h
     server-tools.cpp

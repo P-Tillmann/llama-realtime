@@ -3,6 +3,7 @@
 #include "server-common.h"
 #include "server-context.h"
 #include "server-task.h"
+#include "server-turn.h"
 
 #include "base64.hpp"
 #include "chat.h"
@@ -122,6 +123,60 @@ json output_modalities_json(mtmd_helper_gen_audio_out_mode mode) {
 
 json max_output_tokens_json(int32_t n) {
     return n < 0 ? json("inf") : json(n);
+}
+
+// turn_detection: null, server_vad or semantic_vad; fields left out keep their defaults
+bool parse_turn_detection(const json & j, std::optional<server_turn_params> & out, std::string & err) {
+    if (j.is_null()) {
+        out.reset();
+        return true;
+    }
+    if (!j.is_object()) {
+        err = "turn_detection must be an object or null";
+        return false;
+    }
+    server_turn_params p;
+    p.type = json_value(j, "type", std::string("server_vad"));
+    if (p.type != "server_vad" && p.type != "semantic_vad") {
+        err = "turn_detection: unknown type " + p.type;
+        return false;
+    }
+    p.create_response    = json_value(j, "create_response", p.create_response);
+    p.interrupt_response = json_value(j, "interrupt_response", p.interrupt_response);
+    if (p.type == "server_vad") {
+        p.threshold           = json_value(j, "threshold", p.threshold);
+        p.prefix_padding_ms   = json_value(j, "prefix_padding_ms", p.prefix_padding_ms);
+        p.silence_duration_ms = json_value(j, "silence_duration_ms", p.silence_duration_ms);
+        if (j.contains("idle_timeout_ms") && !j["idle_timeout_ms"].is_null()) {
+            p.idle_timeout_ms = j["idle_timeout_ms"].get<int>();
+        }
+        if (p.threshold <= 0.0f || p.threshold >= 1.0f || p.prefix_padding_ms < 0 || p.silence_duration_ms < 0) {
+            err = "turn_detection: threshold must be in (0, 1), prefix_padding_ms and silence_duration_ms >= 0";
+            return false;
+        }
+    } else {
+        p.eagerness = json_value(j, "eagerness", p.eagerness);
+        if (p.eagerness != "low" && p.eagerness != "medium" && p.eagerness != "high" && p.eagerness != "auto") {
+            err = "turn_detection: eagerness must be low, medium, high or auto";
+            return false;
+        }
+    }
+    out = p;
+    return true;
+}
+
+json turn_detection_json(const std::optional<server_turn_params> & p) {
+    if (!p) {
+        return nullptr;
+    }
+    if (p->type == "semantic_vad") {
+        return {{"type", p->type}, {"eagerness", p->eagerness}, {"create_response", p->create_response},
+                {"interrupt_response", p->interrupt_response}};
+    }
+    return {{"type", p->type}, {"threshold", p->threshold}, {"prefix_padding_ms", p->prefix_padding_ms},
+            {"silence_duration_ms", p->silence_duration_ms},
+            {"idle_timeout_ms", p->idle_timeout_ms < 0 ? json(nullptr) : json(p->idle_timeout_ms)},
+            {"create_response", p->create_response}, {"interrupt_response", p->interrupt_response}};
 }
 
 //
@@ -322,6 +377,12 @@ struct realtime_conversation {
     json        include         = nullptr;
     json        prompt          = nullptr;
 
+    std::optional<server_turn_params>     turn_params;     // null: the client commits the audio
+    std::unique_ptr<server_turn_detector> detector;        // owned by the reader thread
+    std::string                           speech_item_id;  // the user item of the speech in progress
+    std::atomic<bool>                     responding{false};
+    std::atomic<bool>                     response_ended{false}; // for the idle timeout of the detector
+
     pcm_resampler in_rs;  // client rate -> model rate, owned by the reader thread
     pcm_resampler out_rs; // model rate -> client rate, owned by the result loop
 
@@ -391,7 +452,7 @@ struct realtime_conversation {
             {"format",          in_fmt.to_json()},
             {"transcription",   transcription},
             {"noise_reduction", noise_reduction},
-            {"turn_detection",  nullptr},
+            {"turn_detection",  turn_detection_json(turn_params)},
         };
         if (type == "transcription") {
             audio_in["transcription"] = {{"model", deps.meta.model_name}, {"language", language.empty() ? json(nullptr) : json(language)},
@@ -563,16 +624,71 @@ struct realtime_conversation {
             return;
         }
         const std::vector<float> in = decode_audio(pcm, in_fmt);
-        std::vector<float> samples  = in_rs.process(in.data(), in.size());
-        if (in.empty() || !ensure_turn()) {
+        if (in.empty()) {
             return;
         }
+        std::vector<float> samples = in_rs.process(in.data(), in.size());
+        if (detector) {
+            on_turn_audio(samples);
+            return;
+        }
+        if (!ensure_turn()) {
+            return;
+        }
+        has_audio = true; // samples held back by the resampler come with the next audio or the commit
+        append_audio(std::move(samples));
+    }
+
+    bool append_audio(std::vector<float> samples) {
         if (samples.empty()) {
-            has_audio = true; // held back by the resampler until more audio or the commit
-            return;
+            return true;
         }
-        if (control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, std::move(samples))) {
-            has_audio = true;
+        if (!ensure_turn() || !control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, std::move(samples))) {
+            return false;
+        }
+        has_audio = true;
+        return true;
+    }
+
+    // turn detection: the audio of a turn goes into the conversation from the start of speech, its end commits it
+    void on_turn_audio(const std::vector<float> & samples) {
+        if (response_ended.exchange(false)) {
+            detector->response_done();
+        }
+        for (auto & a : detector->push(samples.data(), samples.size())) {
+            switch (a.kind) {
+                case server_turn_action::SPEECH_STARTED:
+                    {
+                        speech_item_id = "item_" + random_string();
+                        if (turn_params->interrupt_response && responding) {
+                            control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
+                        }
+                        send_event({{"type", "input_audio_buffer.speech_started"}, {"audio_start_ms", a.audio_ms},
+                                    {"item_id", speech_item_id}});
+                    } break;
+                case server_turn_action::AUDIO:
+                    {
+                        append_audio(std::move(a.audio));
+                    } break;
+                case server_turn_action::SPEECH_STOPPED:
+                    {
+                        send_event({{"type", "input_audio_buffer.speech_stopped"}, {"audio_end_ms", a.audio_ms},
+                                    {"item_id", speech_item_id}});
+                        if (commit() && turn_params->create_response) {
+                            on_response_create(json::object());
+                        }
+                    } break;
+                case server_turn_action::IDLE_TIMEOUT:
+                    {
+                        // the user stayed silent: the model takes the turn
+                        const std::string item = "item_" + random_string();
+                        send_event({{"type", "input_audio_buffer.timeout_triggered"}, {"audio_start_ms", a.audio_ms},
+                                    {"audio_end_ms", a.audio_ms}, {"item_id", item}});
+                        if (turn_params->create_response && ensure_turn()) {
+                            on_response_create(json::object());
+                        }
+                    } break;
+            }
         }
     }
 
@@ -593,7 +709,8 @@ struct realtime_conversation {
 
         std::lock_guard<std::mutex> lock(mutex);
         const json prev = last_item_id.empty() ? json(nullptr) : json(last_item_id);
-        last_item_id = "item_" + random_string();
+        last_item_id = speech_item_id.empty() ? "item_" + random_string() : speech_item_id;
+        speech_item_id.clear();
         send_event({{"type", "input_audio_buffer.committed"}, {"previous_item_id", prev}, {"item_id", last_item_id}});
         const json item = {{"id", last_item_id}, {"type", "message"}, {"status", "completed"}, {"role", "user"},
                            {"content", json::array({{{"type", "input_audio"}, {"transcript", nullptr}}})}};
@@ -783,7 +900,9 @@ struct realtime_conversation {
             }
             send_event({{"type", "response.created"}, {"response", response_json("in_progress", nullptr, nullptr)}});
         }
+        responding = true;
         if (!control(SERVER_CONTROL_ACTION_RESPONSE_CREATE, prompt, {}, response)) {
+            responding = false;
             return;
         }
         // the response ends the turn, its tokens are in the slot; the footer goes in before the next turn
@@ -865,8 +984,9 @@ struct realtime_conversation {
             reject("audio.output." + err);
             return;
         }
-        if (in.contains("turn_detection") && !in["turn_detection"].is_null()) {
-            reject("audio.input.turn_detection is not supported yet, set it to null and commit the audio buffer");
+        std::optional<server_turn_params> new_turn = turn_params;
+        if (in.contains("turn_detection") && !parse_turn_detection(in["turn_detection"], new_turn, err)) {
+            reject("audio.input." + err);
             return;
         }
         json new_transcription = transcription;
@@ -927,6 +1047,13 @@ struct realtime_conversation {
         {
             std::lock_guard<std::mutex> lock(mutex);
             out_fmt = new_out_fmt;
+        }
+        if (in.contains("turn_detection")) {
+            turn_params = new_turn;
+            detector.reset();
+            if (turn_params) {
+                detector = std::make_unique<server_turn_detector>(*turn_params, server_vad_energy(model_in_rate), nullptr);
+            }
         }
         send_event({{"type", "session.updated"}, {"session", session_json()}});
     }
@@ -1186,6 +1313,8 @@ struct realtime_conversation {
             send_event({{"type", "response.output_item.done"}, {"response_id", response_id}, {"output_index", i}, {"item", output[i]}});
         }
         send_event({{"type", "response.done"}, {"response", response_json(status, details, usage_json(res))}});
+        responding     = false;
+        response_ended = true;
         // the context window of the conversation stands in for the token budget
         send_event({{"type", "rate_limits.updated"}, {"rate_limits", json::array({{
             {"name", "tokens"}, {"limit", res.n_ctx}, {"remaining", std::max(0, res.n_ctx - res.n_past)}, {"reset_seconds", 0},
