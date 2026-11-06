@@ -1,0 +1,94 @@
+# Fork-only: builds llama-server, runs the realtime scenarios against LFM3-Audio and compares them with the
+# recorded OpenAI fixtures. The report goes to the job summary; mismatches do not fail the job yet.
+name: Realtime - conformance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - realtime
+      - 'rt/**'
+      - 'up/**'
+    paths:
+      - '.github/workflows/realtime-conformance.yml'
+      - 'tools/server/**'
+      - 'tools/mtmd/**'
+      - 'tools/realtime-harness/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: realtime-conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HF_REPO: LiquidAI/LFM3-Audio-2B-GGUF
+  MODEL: LFM3-Audio-2B-Q4_K_M.gguf
+  MMPROJ: mmproj-LFM3-Audio-2B-F16.gguf
+
+jobs:
+  conformance:
+    if: github.repository != 'ggml-org/llama.cpp'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install harness dependencies
+        run: pip install -r tools/realtime-harness/requirements.txt
+
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.24
+        with:
+          key: realtime-conformance
+          evict-old-files: 1d
+
+      - name: Build llama-server
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF
+          cmake --build build -j $(nproc) --target llama-server
+
+      - name: Model cache
+        uses: actions/cache@v5
+        with:
+          path: models
+          key: realtime-models-${{ env.MODEL }}-${{ env.MMPROJ }}
+
+      - name: Download model
+        run: |
+          mkdir -p models
+          for f in "$MODEL" "$MMPROJ"; do
+            [ -f "models/$f" ] || curl -fsSL -o "models/$f" "https://huggingface.co/$HF_REPO/resolve/main/$f"
+          done
+
+      - name: Start llama-server
+        run: |
+          ./build/bin/llama-server -m "models/$MODEL" --mmproj "models/$MMPROJ" --temp 0 --port 8080 > server.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && exit 0; sleep 2; done
+          cat server.log; exit 1
+
+      - name: Run scenarios
+        working-directory: tools/realtime-harness
+        run: python harness.py record --target local --out out/local --timeout 120
+
+      - name: Compare with OpenAI fixtures
+        working-directory: tools/realtime-harness
+        run: |
+          if ls fixtures/openai/*.json > /dev/null 2>&1; then
+            python harness.py compare fixtures/openai out/local --report out/report.md > /dev/null
+            cat out/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No OpenAI fixtures yet: run the 'Realtime - record OpenAI fixtures' workflow first." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: realtime-conformance
+          path: |
+            tools/realtime-harness/out
+            server.log

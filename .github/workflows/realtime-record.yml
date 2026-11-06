@@ -1,0 +1,62 @@
+# Fork-only: records reference sessions from the OpenAI Realtime API into tools/realtime-harness/fixtures/openai
+# and commits them to the branch the workflow runs on. Needs the repository secret OPENAI_API_KEY.
+name: Realtime - record OpenAI fixtures
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'OpenAI realtime model'
+        required: false
+        default: 'gpt-realtime'
+        type: string
+      scenarios:
+        description: 'Space-separated scenario names (empty = all)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: realtime-record-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: github.repository != 'ggml-org/llama.cpp'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install harness dependencies
+        run: pip install -r tools/realtime-harness/requirements.txt
+
+      - name: Record
+        working-directory: tools/realtime-harness
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MODEL: ${{ inputs.model }}
+          SCENARIOS: ${{ inputs.scenarios }}
+        run: |
+          args=()
+          for s in $SCENARIOS; do args+=(--scenario "$s"); done
+          python harness.py record --target openai --model "$MODEL" --out fixtures/openai "${args[@]}" | tee record.log
+          { echo '```'; cat record.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit fixtures
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/realtime-harness/fixtures/openai
+          if git diff --cached --quiet; then
+            echo "fixtures unchanged"
+          else
+            git commit -m "realtime-harness : record OpenAI fixtures (${{ inputs.model }})"
+            git push
+          fi
