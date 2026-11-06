@@ -92,6 +92,16 @@ private:
     bool        truncated     = false;
     llama_token sampled    = LLAMA_TOKEN_NULL; // next text token of the response, sampled right after the slot's own decode
 
+    // a point of the conversation to go back to: positions, counters and, for recurrent/hybrid memory, the state
+    struct mark {
+        std::string          name;
+        llama_pos            n_past     = 0;
+        int32_t              n_audio    = 0;
+        int32_t              n_prev_end = 0;
+        std::vector<uint8_t> state;
+    };
+    std::vector<mark> marks;
+
     mtmd::audio_stream_ptr stream;   // the audio of the open turn
     mtmd_helper::gen_audio gen;      // set if the model generates audio
     std::vector<float>     h_state;  // hidden state that the gen-audio pipeline steps from
@@ -106,4 +116,6 @@ private:
     std::string piece(llama_token tok) const;
     bool response_start(const server_realtime_op & op);
     bool response_step();
+    bool set_mark(const std::string & name);
+    bool rollback(const std::string & name);
 };
