@@ -1060,7 +1060,9 @@ struct realtime_conversation {
             turn_params = new_turn;
             detector.reset();
             if (turn_params) {
-                detector = std::make_unique<server_turn_detector>(*turn_params, make_vad(), nullptr);
+                // the turn model runs on 16 kHz audio, like Silero
+                server_turn_model * tm = deps.turn_model && model_in_rate == deps.turn_model->sample_rate() ? deps.turn_model.get() : nullptr;
+                detector = std::make_unique<server_turn_detector>(*turn_params, make_vad(), tm);
             }
         }
         send_event({{"type", "session.updated"}, {"session", session_json()}});

@@ -2562,6 +2562,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_VAD_MODEL"));
     add_opt(common_arg(
+        {"--turn-model"}, "FILE",
+        "path to a Smart Turn GGUF: semantic_vad of /v1/realtime ends a turn when the speaker is done (default: by silence)\n"
+        "see tools/server/realtime-models",
+        [](common_params & params, const std::string & value) {
+            params.turn_model = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_TURN_MODEL"));
+    add_opt(common_arg(
         {"-mmu", "--mmproj-url"}, "URL",
         "URL to a multimodal projector file. see tools/mtmd/README.md",
         [](common_params & params, const std::string & value) {

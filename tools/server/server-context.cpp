@@ -1035,8 +1035,9 @@ public:
     // prompt of the "asr" chat template, for live ASR
     llama_tokens asr_prompt;
 
-    // the VAD of realtime turn detection, shared by the sessions
-    std::shared_ptr<server_vad_model> vad_model;
+    // the VAD and the turn model of realtime turn detection, shared by the sessions
+    std::shared_ptr<server_vad_model>  vad_model;
+    std::shared_ptr<server_turn_model> turn_model;
 
     bool has_cap_tts() const {
         return mtmd_cap.audio_gen;
@@ -1428,6 +1429,14 @@ private:
                 return false;
             }
             SRV_INF("loaded the VAD model %s\n", params_base.vad_model.c_str());
+        }
+        if (!params_base.turn_model.empty()) {
+            turn_model = server_turn_model_load(params_base.turn_model, params_base.cpuparams.n_threads);
+            if (!turn_model) {
+                SRV_ERR("failed to load the turn model %s\n", params_base.turn_model.c_str());
+                return false;
+            }
+            SRV_INF("loaded the turn model %s\n", params_base.turn_model.c_str());
         }
 
         if (!llama_memory_can_shift(llama_get_memory(ctx_tgt))) {
@@ -6174,7 +6183,7 @@ void server_routes::init_routes() {
         const bool live_asr = !ctx_server.asr_prompt.empty() && req.get_param("intent") == "transcription";
         if (ctx_server.mtmd_cap.audio_stream && ctx_server.mtmd_cap.chat && !live_asr) {
             server_realtime_conversation({queue_tasks, queue_results, *meta, params.sampling, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab,
-                                          ctx_server.vad_model}, conn);
+                                          ctx_server.vad_model, ctx_server.turn_model}, conn);
             return;
         }
 
