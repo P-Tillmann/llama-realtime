@@ -65,9 +65,28 @@ jobs:
             [ -f "models/$f" ] || curl -fsSL -o "models/$f" "https://huggingface.co/$HF_REPO/resolve/main/$f"
           done
 
+      - name: Turn detection models cache
+        id: turn-models
+        uses: actions/cache@v5
+        with:
+          path: turn-models
+          key: realtime-turn-models-${{ hashFiles('tools/server/realtime-models/*.py') }}
+
+      - name: Convert turn detection models
+        if: steps.turn-models.outputs.cache-hit != 'true'
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install silero-vad onnx gguf numpy
+          mkdir -p turn-models
+          python tools/server/realtime-models/convert_silero_vad.py turn-models/silero-vad.gguf
+          curl -fsSL -o turn-models/smart-turn.onnx https://huggingface.co/pipecat-ai/smart-turn-v3/resolve/main/smart-turn-v3.2-gpu.onnx
+          python tools/server/realtime-models/convert_smart_turn.py turn-models/smart-turn.onnx turn-models/smart-turn.gguf
+          rm turn-models/smart-turn.onnx
+
       - name: Start llama-server
         run: |
-          ./build/bin/llama-server -m "models/$MODEL" --mmproj "models/$MMPROJ" --temp 0 --port 8080 > server.log 2>&1 &
+          ./build/bin/llama-server -m "models/$MODEL" --mmproj "models/$MMPROJ" --temp 0 --port 8080 \
+            --vad-model turn-models/silero-vad.gguf --turn-model turn-models/smart-turn.gguf > server.log 2>&1 &
           for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && exit 0; sleep 2; done
           cat server.log; exit 1
 
