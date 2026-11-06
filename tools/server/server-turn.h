@@ -35,6 +35,11 @@ struct server_vad {
 // level-based VAD with an adaptive noise floor, used when no VAD model is loaded
 std::unique_ptr<server_vad> server_vad_energy(int sample_rate);
 
+// Silero VAD (16 kHz): the weights are loaded once and shared, each session gets its own state
+struct server_vad_model;
+std::shared_ptr<server_vad_model> server_vad_model_load(const std::string & path); // null on error
+std::unique_ptr<server_vad>       server_vad_silero(std::shared_ptr<server_vad_model> model);
+
 // probability that the speaker finished their turn, from the audio of the turn
 struct server_turn_model {
     virtual ~server_turn_model() = default;

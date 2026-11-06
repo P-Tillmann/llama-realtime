@@ -10,11 +10,13 @@
 #include "sampling.h"
 
 #include <deque>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
 struct server_context_meta;
+struct server_vad_model;
 struct common_params_sampling;
 struct mtmd_context;
 struct mtmd_helper_cap;
@@ -28,6 +30,7 @@ struct server_realtime_deps {
     mtmd_context *                 mctx;
     const mtmd_helper_cap &        cap;
     const llama_vocab *            vocab;
+    std::shared_ptr<server_vad_model> vad_model; // null: a level-based VAD
 };
 
 // a realtime conversation over websocket, for models that answer after the audio (e.g. LFM3-Audio):

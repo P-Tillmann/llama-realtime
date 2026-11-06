@@ -2554,6 +2554,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_examples(mmproj_examples).set_env("LLAMA_ARG_MMPROJ"));
     add_opt(common_arg(
+        {"--vad-model"}, "FILE",
+        "path to a Silero VAD GGUF for the turn detection of /v1/realtime (default: a level-based VAD)\n"
+        "see tools/server/realtime-models",
+        [](common_params & params, const std::string & value) {
+            params.vad_model = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_VAD_MODEL"));
+    add_opt(common_arg(
         {"-mmu", "--mmproj-url"}, "URL",
         "URL to a multimodal projector file. see tools/mtmd/README.md",
         [](common_params & params, const std::string & value) {

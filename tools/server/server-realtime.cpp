@@ -650,6 +650,14 @@ struct realtime_conversation {
         return true;
     }
 
+    // Silero runs on 16 kHz audio, at other model rates the level-based VAD is used
+    std::unique_ptr<server_vad> make_vad() const {
+        if (deps.vad_model && model_in_rate == 16000) {
+            return server_vad_silero(deps.vad_model);
+        }
+        return server_vad_energy(model_in_rate);
+    }
+
     // turn detection: the audio of a turn goes into the conversation from the start of speech, its end commits it
     void on_turn_audio(const std::vector<float> & samples) {
         if (response_ended.exchange(false)) {
@@ -1052,7 +1060,7 @@ struct realtime_conversation {
             turn_params = new_turn;
             detector.reset();
             if (turn_params) {
-                detector = std::make_unique<server_turn_detector>(*turn_params, server_vad_energy(model_in_rate), nullptr);
+                detector = std::make_unique<server_turn_detector>(*turn_params, make_vad(), nullptr);
             }
         }
         send_event({{"type", "session.updated"}, {"session", session_json()}});

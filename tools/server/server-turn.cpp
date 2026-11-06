@@ -6,14 +6,17 @@
 namespace {
 
 struct vad_energy : server_vad {
-    int   rate;
-    float noise_db = -60.0f; // noise floor, follows the level between speech
+    static constexpr int WINDOW = 47; // frames of the noise floor window, about 1.5 s
+
+    int               rate;
+    std::deque<float> levels; // dB of the last frames
 
     explicit vad_energy(int rate) : rate(rate) {}
 
     int sample_rate() const override { return rate; }
     int frame_size() const override { return rate * 32 / 1000; }
 
+    // the noise floor is the quietest frame of the window: it follows steady noise, speech pauses keep it low
     float speech_prob(const float * frame) override {
         const int n = frame_size();
         double sum = 0;
@@ -21,20 +24,18 @@ struct vad_energy : server_vad {
             sum += (double) frame[i] * frame[i];
         }
         const float db = 10.0f * std::log10((float) (sum / n) + 1e-12f);
+        levels.push_back(std::max(db, -90.0f));
+        if ((int) levels.size() > WINDOW) {
+            levels.pop_front();
+        }
         if (db < -50.0f) {
-            noise_db = std::max(-90.0f, std::min(noise_db, db));
             return 0.0f;
         }
-        const float p = 1.0f / (1.0f + std::exp(-(db - noise_db - 12.0f) / 2.0f));
-        if (p < 0.5f) {
-            // the floor drops fast and rises slowly, so speech does not pull it up
-            noise_db += (db < noise_db ? 0.3f : 0.02f) * (db - noise_db);
-            noise_db  = std::max(-90.0f, std::min(-20.0f, noise_db));
-        }
-        return p;
+        const float noise_db = std::max(-70.0f, *std::min_element(levels.begin(), levels.end()));
+        return 1.0f / (1.0f + std::exp(-(db - noise_db - 12.0f) / 2.0f));
     }
 
-    void reset() override { noise_db = -60.0f; }
+    void reset() override { levels.clear(); }
 };
 
 // semantic_vad: how long a silence ends the turn without a turn model, the longest silence with one,
