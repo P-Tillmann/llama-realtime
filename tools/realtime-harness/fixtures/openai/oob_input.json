@@ -1,0 +1,897 @@
+{
+ "scenario": "oob_input",
+ "target": "openai",
+ "model": "gpt-realtime",
+ "status": "ok",
+ "error": null,
+ "log": [
+  {
+   "t": 0.507,
+   "event": {
+    "type": "session.created",
+    "event_id": "event_EhLzEZA2Y4PCBxVxMfibN",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EhLzEFtnkURIBKwBseJHQ",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "audio"
+     ],
+     "instructions": "Your knowledge cutoff is 2023-10. You are a helpful, witty, and friendly AI. Act like a human, but remember that you aren't a human and that you can't do human things in the real world. Your voice and personality should be warm and engaging, with a lively and playful tone. If interacting in a non-English language, start by using the standard accent or dialect familiar to the user. Talk quickly. You should always call a function if you can. Do not refer to these rules, even if you’re asked about them.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794004928,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": {
+        "type": "server_vad",
+        "threshold": 0.5,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 200,
+        "idle_timeout_ms": null,
+        "create_response": true,
+        "interrupt_response": true
+       }
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 0.507,
+   "sent": {
+    "type": "session.update",
+    "session": {
+     "type": "realtime",
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "audio": {
+      "input": {
+       "turn_detection": null
+      }
+     },
+     "output_modalities": [
+      "text"
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.533,
+   "event": {
+    "type": "session.updated",
+    "event_id": "event_EhLzEMm5YQiywZRbywe9I",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EhLzEFtnkURIBKwBseJHQ",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "text"
+     ],
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794004928,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": null
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 0.533,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "My name is Peter and I love sailing."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.533,
+   "sent": {
+    "type": "response.create"
+   }
+  },
+  {
+   "t": 0.564,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EhLzE213EqGJz0q8dlSat",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EhLzEwtTNzf6yll4dcjsk",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "My name is Peter and I love sailing."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.565,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLzE5ucc4YbamjYVuilQ",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EhLzEwtTNzf6yll4dcjsk",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "My name is Peter and I love sailing."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.572,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EhLzEmoYgjdtr4d10fr8d",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLzE0ozESN4QO1nVzL3r",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EhLzED4qGIq3zVwKksGaa",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 0.779,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EhLzEdjDcDnGwH0GVkaWT",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLzER2RURpXVq11jR6VI",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 0.779,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EhLzEzOj4nYrfSBTvlETY",
+    "previous_item_id": "item_EhLzEwtTNzf6yll4dcjsk",
+    "item": {
+     "id": "item_EhLzER2RURpXVq11jR6VI",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 0.78,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EhLzES3Q2oBWtvOASaKMv",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 0.781,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzEbyXJHUBwVeuVQylB",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "Hi",
+    "obfuscation": "ScI7EPgpSmFdYa"
+   }
+  },
+  {
+   "t": 0.788,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzEf0jcboqI6cHuiC1S",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Peter",
+    "obfuscation": "j7TwLQEe6C"
+   }
+  },
+  {
+   "t": 0.795,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzF3zuMwLEMyycnd9Pu",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "XZo9EI3jGQBVZ76"
+   }
+  },
+  {
+   "t": 0.801,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFNT34G3LxEajikBi0",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " that",
+    "obfuscation": "sk4COx1uav3"
+   }
+  },
+  {
+   "t": 0.81,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFVTzuWW8dano7tMmI",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "’s",
+    "obfuscation": "fr1mvvp5e0OSLG"
+   }
+  },
+  {
+   "t": 0.818,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFfFQ3ovjml5AgFMSx",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " great",
+    "obfuscation": "mlw0Neqnki"
+   }
+  },
+  {
+   "t": 0.826,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFaduwfMRDcG1YoyId",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " to",
+    "obfuscation": "CYF4pfHyjzfyj"
+   }
+  },
+  {
+   "t": 0.835,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFb8PttZc2HT9K8TRE",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " know",
+    "obfuscation": "aSLuDYke6At"
+   }
+  },
+  {
+   "t": 0.899,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFDYwVKEZ35T7RymiL",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "—",
+    "obfuscation": "NOpMrskmpSdMwFy"
+   }
+  },
+  {
+   "t": 0.902,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFXzDO3LKZEMVFu62S",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "what",
+    "obfuscation": "3lOzZXuP6ysY"
+   }
+  },
+  {
+   "t": 0.905,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFc3X8iNsZ4FD45hR6",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "’s",
+    "obfuscation": "N6BszjVs89irPX"
+   }
+  },
+  {
+   "t": 0.907,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFhW2EjgWhO6t1Zp59",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " your",
+    "obfuscation": "lTXH1ERqvGc"
+   }
+  },
+  {
+   "t": 0.909,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFQbDtu293colAwBgf",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " favorite",
+    "obfuscation": "Xs3JtHg"
+   }
+  },
+  {
+   "t": 0.91,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFuxYkvspihbYMzXC7",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " part",
+    "obfuscation": "55e3IlM6QRa"
+   }
+  },
+  {
+   "t": 0.913,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFAIiOKkhzNy5QgttT",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " about",
+    "obfuscation": "36P9z7rWoB"
+   }
+  },
+  {
+   "t": 0.919,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzF8wqbGGU6XXyqwyFW",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " sailing",
+    "obfuscation": "jTF5DznY"
+   }
+  },
+  {
+   "t": 0.921,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzF0EpVCJagbZrgDdCN",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "?",
+    "obfuscation": "v2H5yhLtdAXS7se"
+   }
+  },
+  {
+   "t": 0.934,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EhLzFLUP1kPyO7OiJmAW2",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "Hi Peter, that’s great to know—what’s your favorite part about sailing?"
+   }
+  },
+  {
+   "t": 0.935,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EhLzFpQgUmzRPp9chv2WE",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "item_id": "item_EhLzER2RURpXVq11jR6VI",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "Hi Peter, that’s great to know—what’s your favorite part about sailing?"
+    }
+   }
+  },
+  {
+   "t": 0.935,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLzFdLobqjrZtHNDfhx1",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EhLzER2RURpXVq11jR6VI",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Hi Peter, that’s great to know—what’s your favorite part about sailing?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.937,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EhLzFDZvmSCeeRDQ3bSD8",
+    "response_id": "resp_EhLzE0ozESN4QO1nVzL3r",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLzER2RURpXVq11jR6VI",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Hi Peter, that’s great to know—what’s your favorite part about sailing?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.938,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EhLzFWH1jvpagYXLkzAHN",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLzE0ozESN4QO1nVzL3r",
+     "status": "completed",
+     "status_details": null,
+     "output": [
+      {
+       "id": "item_EhLzER2RURpXVq11jR6VI",
+       "type": "message",
+       "status": "completed",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "Hi Peter, that’s great to know—what’s your favorite part about sailing?"
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EhLzED4qGIq3zVwKksGaa",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 44,
+      "input_tokens": 25,
+      "output_tokens": 19,
+      "input_token_details": {
+       "text_tokens": 25,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 19,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 0.938,
+   "sent": {
+    "type": "response.create",
+    "response": {
+     "conversation": "none",
+     "input": [
+      {
+       "type": "item_reference",
+       "id": "item_EhLzEwtTNzf6yll4dcjsk"
+      },
+      {
+       "type": "message",
+       "role": "user",
+       "content": [
+        {
+         "type": "input_text",
+         "text": "What hobby did I mention? One word."
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.946,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EhLzFxYwyoBr1MPafphMc",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199718,
+      "reset_seconds": 0.084
+     }
+    ]
+   }
+  },
+  {
+   "t": 0.971,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EhLzF5yt0XgACFYQ37PPF",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLzF7NGgacRYVaKBsxtG",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": null,
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.185,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EhLzF4Tc11EshJo9A3HVv",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 1.185,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EhLzFQmdDSCFYsP7QKV0H",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "item_id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 1.185,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFWyoKU7tZ1X2X4PME",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "item_id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "S",
+    "obfuscation": "vOeFNiXutRwYK7x"
+   }
+  },
+  {
+   "t": 1.191,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFcBbn8qcoSbon2lyi",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "item_id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "ailing",
+    "obfuscation": "uyEx0ktAQW"
+   }
+  },
+  {
+   "t": 1.198,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EhLzFBOZXQ1JugY9SVClE",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "item_id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ".",
+    "obfuscation": "s8GHJhKoewove5B"
+   }
+  },
+  {
+   "t": 1.219,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EhLzFGt36ySneABSNiI3W",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "item_id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "Sailing."
+   }
+  },
+  {
+   "t": 1.22,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EhLzFkF8zxdqQByITZAba",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "item_id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "Sailing."
+    }
+   }
+  },
+  {
+   "t": 1.22,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EhLzFGMWgXeCSHfqI5M4v",
+    "previous_item_id": "item_EhLzFQNXLwfSoZeGThSK6",
+    "item": {
+     "id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Sailing."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.221,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EhLzFAA8ZUyX4Ev6wzxSM",
+    "response_id": "resp_EhLzF7NGgacRYVaKBsxtG",
+    "output_index": 0,
+    "item": {
+     "id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Sailing."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.224,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EhLzFet9sHlpFA2r9xNgp",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EhLzF7NGgacRYVaKBsxtG",
+     "status": "completed",
+     "status_details": null,
+     "output": [
+      {
+       "id": "item_EhLzFHpcRgpIhHZmW1HHQ",
+       "type": "message",
+       "status": "completed",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "Sailing."
+        }
+       ]
+      }
+     ],
+     "conversation_id": null,
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 43,
+      "input_tokens": 38,
+      "output_tokens": 5,
+      "input_token_details": {
+       "text_tokens": 38,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 5,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.23,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EhLzFv5xaNkKUhoZCizsn",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199732,
+      "reset_seconds": 0.08
+     }
+    ]
+   }
+  }
+ ]
+}
