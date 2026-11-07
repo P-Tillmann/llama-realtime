@@ -1,5 +1,6 @@
-# Fork-only: builds llama-server, runs the realtime scenarios against LFM3-Audio and compares them with the
-# recorded OpenAI fixtures. The report goes to the job summary; mismatches do not fail the job yet.
+# Fork-only: builds llama-server, runs the realtime scenarios against LFM3-Audio, then against a cascade (a text
+# model with LFM3-Audio as ASR and voice), and compares them with the recorded OpenAI fixtures.
+# The reports go to the job summary; mismatches do not fail the job yet.
 name: Realtime - conformance
 
 on:
@@ -26,6 +27,9 @@ env:
   HF_REPO: LiquidAI/LFM3-Audio-2B-GGUF
   MODEL: LFM3-Audio-2B-Q4_K_M.gguf
   MMPROJ: mmproj-LFM3-Audio-2B-F16.gguf
+  # cascade: a text model that hears through LFM3 (--asr-model) and speaks with it (--voice-model)
+  TEXT_URL: https://huggingface.co/ggml-org/ultravox-v0_5-llama-3_2-1b-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf
+  TEXT_MODEL: Llama-3.2-1B-Instruct-Q4_K_M.gguf
 
 jobs:
   conformance:
@@ -56,7 +60,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: models
-          key: realtime-models-${{ env.MODEL }}-${{ env.MMPROJ }}
+          key: realtime-models-${{ env.MODEL }}-${{ env.MMPROJ }}-${{ env.TEXT_MODEL }}
 
       - name: Download model
         run: |
@@ -64,6 +68,7 @@ jobs:
           for f in "$MODEL" "$MMPROJ"; do
             [ -f "models/$f" ] || curl -fsSL -o "models/$f" "https://huggingface.co/$HF_REPO/resolve/main/$f"
           done
+          [ -f "models/$TEXT_MODEL" ] || curl -fsSL -o "models/$TEXT_MODEL" "$TEXT_URL"
 
       - name: Turn detection models cache
         id: turn-models
@@ -104,6 +109,30 @@ jobs:
             echo "No OpenAI fixtures yet: run the 'Realtime - record OpenAI fixtures' workflow first." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Start llama-server (cascade)
+        run: |
+          pkill -f llama-server || true
+          sleep 2
+          ./build/bin/llama-server -m "models/$TEXT_MODEL" --temp 0 --port 8080 \
+            --asr-model "model=models/$MODEL,mmproj=models/$MMPROJ" \
+            --voice-model "model=models/$MODEL,mmproj=models/$MMPROJ,name=lfm3" \
+            --vad-model turn-models/silero-vad.gguf --turn-model turn-models/smart-turn.gguf > server-cascade.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && exit 0; sleep 2; done
+          cat server-cascade.log; exit 1
+
+      - name: Run scenarios (cascade)
+        working-directory: tools/realtime-harness
+        run: python harness.py record --target local --out out/cascade --timeout 120
+
+      - name: Compare with OpenAI fixtures (cascade)
+        working-directory: tools/realtime-harness
+        run: |
+          if ls fixtures/openai/*.json > /dev/null 2>&1; then
+            python harness.py compare fixtures/openai out/cascade --report out/report-cascade.md > /dev/null
+            echo "## Cascade: Llama 3.2 1B + LFM3-Audio (ASR, voice)" >> "$GITHUB_STEP_SUMMARY"
+            cat out/report-cascade.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -111,3 +140,4 @@ jobs:
           path: |
             tools/realtime-harness/out
             server.log
+            server-cascade.log

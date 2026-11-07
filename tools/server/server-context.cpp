@@ -9,6 +9,7 @@
 #include "server-task.h"
 #include "server-queue.h"
 #include "server-realtime.h"
+#include "server-asr.h"
 #include "server-turn.h"
 #include "server-voice.h"
 #include "server-schema.h"
@@ -1040,6 +1041,7 @@ public:
     std::shared_ptr<server_vad_model>  vad_model;
     std::shared_ptr<server_turn_model> turn_model;
     std::shared_ptr<server_voices>     voices;
+    std::shared_ptr<server_asr>        asr; // speech recognition of realtime sessions for models without audio input
 
     bool has_cap_tts() const {
         return mtmd_cap.audio_gen;
@@ -1449,6 +1451,14 @@ private:
                 voices = std::make_shared<server_voices>(vp, params_base);
             } catch (const std::exception & e) {
                 SRV_ERR("voice models: %s\n", e.what());
+                return false;
+            }
+        }
+        if (!params_base.asr_model.empty()) {
+            try {
+                asr = std::make_shared<server_asr>(server_asr_params_parse(params_base.asr_model), params_base);
+            } catch (const std::exception & e) {
+                SRV_ERR("ASR model: %s\n", e.what());
                 return false;
             }
         }
@@ -6253,12 +6263,12 @@ void server_routes::init_routes() {
         };
 
         // chat models with audio input hold a conversation, see server-realtime.h; without an audio stream the
-        // audio of a turn is encoded when it ends
+        // audio of a turn is encoded when it ends; with --asr-model any chat model does, the user audio is transcribed
         // live transcription: Voxtral Realtime (no chat), or an "asr" model in a session opened with ?intent=transcription
         const bool live_asr = !ctx_server.asr_prompt.empty() && req.get_param("intent") == "transcription";
-        if ((ctx_server.mtmd_cap.audio_stream || ctx_server.mtmd_cap.audio) && ctx_server.mtmd_cap.chat && !live_asr) {
+        if ((ctx_server.mtmd_cap.audio_stream || ctx_server.mtmd_cap.audio || ctx_server.asr) && ctx_server.mtmd_cap.chat && !live_asr) {
             server_realtime_conversation({queue_tasks, queue_results, *meta, params.sampling, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab,
-                                          ctx_server.vad_model, ctx_server.turn_model, ctx_server.voices,
+                                          ctx_server.vad_model, ctx_server.turn_model, ctx_server.voices, ctx_server.asr,
                                           meta->chat_params.allow_audio ? realtime_transcribe : nullptr}, conn);
             return;
         }

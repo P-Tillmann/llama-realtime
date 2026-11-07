@@ -610,7 +610,8 @@ struct common_params {
     // realtime turn detection (see tools/server/realtime-models)
     std::string vad_model;                      // Silero VAD GGUF
     std::string turn_model;                     // Smart Turn GGUF (semantic_vad)
-    std::vector<std::string> voice_models;      // text-to-speech models for /v1/realtime, see server-voice.h
+    std::vector<std::string> voice_models;
+    std::string asr_model; // --asr-model spec, speech recognition of /v1/realtime for models without audio input      // text-to-speech models for /v1/realtime, see server-voice.h
     std::vector<std::string> image;             // path to image file(s) ; TODO: change the name to "media"
     int image_min_tokens = -1;
     int image_max_tokens = -1;
