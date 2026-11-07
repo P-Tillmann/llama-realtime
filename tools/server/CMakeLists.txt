@@ -23,6 +23,8 @@ add_library(${TARGET} STATIC
     server-turn.h
     server-vad.cpp
     server-turn-model.cpp
+    server-voice.cpp
+    server-voice.h
     server-stream.cpp
     server-stream.h
     server-tools.cpp

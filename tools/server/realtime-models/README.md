@@ -1,4 +1,4 @@
-# Models for realtime turn detection
+# Models for realtime turn detection and voices
 
 `llama-server` can detect turns in `/v1/realtime` sessions (`turn_detection` of the OpenAI realtime API) with small helper models. Without them a level-based VAD is used, which handles steady noise but not clicks or background voices.
 
@@ -38,3 +38,35 @@ Then enable turn detection in the session:
 {"type": "session.update", "session": {"audio": {"input": {"turn_detection": {"type": "server_vad", "silence_duration_ms": 500}}}}}
 {"type": "session.update", "session": {"audio": {"input": {"turn_detection": {"type": "semantic_vad", "eagerness": "auto"}}}}}
 ```
+
+## Voices
+
+A model that writes text but no audio (e.g. Gemma 4 E2B/E4B, which hears audio) can answer `/v1/realtime` sessions with speech: `--voice-model` loads text-to-speech models into the server process, and each response is spoken sentence by sentence while the language model still writes. Any audio generation model of libmtmd works as a voice; each one gets its own context and worker thread.
+
+```bash
+llama-server -hf ggml-org/gemma-4-E2B-it-GGUF \
+    --vad-model silero-vad.gguf \
+    --voice-model "model=pocket-de.gguf,mmproj=mmproj-pocket-de.gguf,name=de,lang=de;model=pocket-en.gguf,mmproj=mmproj-pocket-en.gguf,name=en"
+```
+
+`SPEC` is `model=FILE,mmproj=FILE[,name=NAME][,lang=LANG][,voice=VOICE][,speaker=FILE]`. Separate several with `;` or repeat the option.
+
+| Key | Meaning |
+| --- | --- |
+| `name` | what sessions select the model by (default: the file name) |
+| `lang` | language passed to models that take one (Qwen3-TTS, LFM3-Audio, Chatterbox Multilingual) |
+| `voice` | default voice: a predefined voice of the model, or a voice of its tts template |
+| `speaker` | a WAV to clone the voice from |
+
+A session selects a voice with `session.audio.output.voice` set to `NAME`, `VOICE` or `NAME/VOICE`. Unknown names, e.g. OpenAI's `marin`, fall back to the first model and its default voice. With voices loaded, `output_modalities: ["audio"]` returns `response.output_audio.delta`, resampled from the voice to the session rate, together with `response.output_audio_transcript.delta` for each spoken piece as its audio starts. `response.cancel` and barge-in by VAD stop the voice; `conversation.item.truncate` cuts the transcript in the conversation where the audio was cut.
+
+Tested with Gemma 4 E2B (Q4_0) on 4 CPU threads, measured from `speech_stopped` to the first audio:
+
+| Voice | Languages | First audio | Note |
+| --- | --- | --- | --- |
+| Pocket TTS | de, en (one model per language) | 1.0–1.3 s (en), 1.6–1.8 s (de) | about 6× faster than real time |
+| Soprano 80M | en | about 1.4 s | |
+| LFM3-Audio 2B | 19 languages, `lang=` | 1.3–1.7 s | about real time |
+| Chatterbox Turbo | en | about 9 s | the vocoder runs once per sentence, no streaming |
+
+Qwen3-TTS and Chatterbox Multilingual load the same way but are untested here. Voices are loaded from local files; there is no `-hf` download for them yet.

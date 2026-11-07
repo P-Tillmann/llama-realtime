@@ -10,6 +10,7 @@
 #include "server-queue.h"
 #include "server-realtime.h"
 #include "server-turn.h"
+#include "server-voice.h"
 #include "server-schema.h"
 #include "server-stream.h"
 
@@ -1038,6 +1039,7 @@ public:
     // the VAD and the turn model of realtime turn detection, shared by the sessions
     std::shared_ptr<server_vad_model>  vad_model;
     std::shared_ptr<server_turn_model> turn_model;
+    std::shared_ptr<server_voices>     voices;
 
     bool has_cap_tts() const {
         return mtmd_cap.audio_gen;
@@ -1437,6 +1439,18 @@ private:
                 return false;
             }
             SRV_INF("loaded the turn model %s\n", params_base.turn_model.c_str());
+        }
+        if (!params_base.voice_models.empty()) {
+            try {
+                std::vector<server_voice_params> vp;
+                for (const auto & spec : params_base.voice_models) {
+                    vp.push_back(server_voice_params_parse(spec));
+                }
+                voices = std::make_shared<server_voices>(vp, params_base);
+            } catch (const std::exception & e) {
+                SRV_ERR("voice models: %s\n", e.what());
+                return false;
+            }
         }
 
         if (!llama_memory_can_shift(llama_get_memory(ctx_tgt))) {
@@ -6243,7 +6257,7 @@ void server_routes::init_routes() {
         const bool live_asr = !ctx_server.asr_prompt.empty() && req.get_param("intent") == "transcription";
         if (ctx_server.mtmd_cap.audio_stream && ctx_server.mtmd_cap.chat && !live_asr) {
             server_realtime_conversation({queue_tasks, queue_results, *meta, params.sampling, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab,
-                                          ctx_server.vad_model, ctx_server.turn_model,
+                                          ctx_server.vad_model, ctx_server.turn_model, ctx_server.voices,
                                           meta->chat_params.allow_audio ? realtime_transcribe : nullptr}, conn);
             return;
         }

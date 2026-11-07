@@ -4,6 +4,7 @@
 #include "server-context.h"
 #include "server-task.h"
 #include "server-turn.h"
+#include "server-voice.h"
 
 #include "base64.hpp"
 #include "chat.h"
@@ -14,6 +15,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <climits>
 #include <cmath>
 #include <cstring>
@@ -427,6 +429,7 @@ struct realtime_conversation {
         std::string          text;        // user text, tool output
         std::vector<float>   pcm;         // user audio at the model rate
         std::string          response_id; // assistant items of one response go in together
+        std::vector<std::pair<int64_t, int64_t>> spoken; // assistant audio of a voice: (end sample, end of its text) per piece
         int64_t              audio_samples = 0; // assistant audio sent, at audio_rate
         int                  audio_rate    = 0;
         std::string          audio;          // the audio as the client sent or got it (retrieve)
@@ -467,6 +470,26 @@ struct realtime_conversation {
     bool        transcript_mode = false;        // the text of the response is the transcript of its audio
     int64_t     out_samples     = 0;            // audio of the response sent so far, at the output rate
     std::string out_audio;                      // and its bytes, for retrieve
+
+    // a response spoken by a voice model: its text goes to the voice in pieces, the response is done after the
+    // audio of the last piece (guarded by mutex, the voice callbacks run on the worker thread of the model)
+    struct voice_segment {
+        int64_t s0 = -1, s1 = -1; // output samples
+        size_t  t0 = 0, t1 = 0;   // characters of the response text
+    };
+    bool                                    voice_resp    = false;
+    int                                     voice_model   = 0;
+    std::string                             voice_name;
+    server_voice_segmenter                  segmenter;
+    size_t                                  voice_text    = 0; // response text given to the segmenter
+    int                                     voice_pending = 0;
+    int32_t                                 voice_frames  = 0;
+    bool                                    llm_done      = false;
+    std::optional<server_task_result_realtime> held_done;
+    std::shared_ptr<std::atomic<bool>>      voice_cancel;
+    std::vector<voice_segment>              voice_segments;
+    size_t                                  voice_sent    = 0; // transcript sent, it goes out with the audio of each piece
+    int                                     voice_jobs    = 0; // jobs of the session not done yet, of any response
     int         idx_text  = -1;
     int         idx_audio = -1;
     json        parts     = json::array();
@@ -497,6 +520,11 @@ struct realtime_conversation {
         });
     }
 
+    // audio output: from a voice model if one is configured, else from a model that speaks itself
+    bool can_speak() const {
+        return deps.voices || deps.cap.audio_gen;
+    }
+
     json session_json() const {
         json audio_in = {
             {"format",          in_fmt.to_json()},
@@ -517,7 +545,7 @@ struct realtime_conversation {
             };
         }
         json audio = {{"input", audio_in}};
-        if (deps.cap.audio_gen) {
+        if (can_speak()) {
             audio["output"] = {{"format", out_fmt.to_json()}, {"voice", voice}, {"speed", speed}};
         }
         return {
@@ -872,6 +900,7 @@ struct realtime_conversation {
                     {
                         speech_item_id = "item_" + random_string();
                         if (turn_params->interrupt_response && responding) {
+                            cancel_voice();
                             control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
                         }
                         send_event({{"type", "input_audio_buffer.speech_started"}, {"audio_start_ms", a.audio_ms},
@@ -1192,7 +1221,21 @@ struct realtime_conversation {
                 // the transcript is cut in proportion to the audio heard, at a word boundary
                 json & content = it.item["content"];
                 std::string tr = content.size() > 0 ? json_value(content[0], "transcript", std::string()) : std::string();
-                size_t keep = n_samples > 0 ? (size_t) ((double) tr.size() * (end_ms * rate / 1000) / n_samples) : tr.size();
+                const int64_t end_s = end_ms * rate / 1000;
+                size_t keep = n_samples > 0 ? (size_t) ((double) tr.size() * end_s / n_samples) : tr.size();
+                if (!it.spoken.empty()) {
+                    // a voice spoke the text piece by piece: whole pieces up to the end, the piece in progress in proportion
+                    int64_t s0 = 0, t0 = 0;
+                    keep = tr.size();
+                    for (const auto & [s1, t1] : it.spoken) {
+                        if (end_s < s1) {
+                            keep = (size_t) (t0 + (t1 - t0) * (end_s - s0) / std::max<int64_t>(1, s1 - s0));
+                            break;
+                        }
+                        s0 = s1;
+                        t0 = t1;
+                    }
+                }
                 if (keep < tr.size()) {
                     const size_t sp = tr.rfind(' ', keep);
                     keep = sp == std::string::npos ? 0 : sp;
@@ -1485,8 +1528,12 @@ struct realtime_conversation {
                 return;
             }
         }
-        if (!deps.cap.audio_gen && mode != MTMD_HELPER_GEN_AUDIO_OUT_TEXT && mode != MTMD_HELPER_GEN_AUDIO_OUT_AUTO) {
-            send_error("response.create: the model cannot generate audio");
+        // with a voice model the session speaks by default, as the OpenAI API
+        if (deps.voices && mode == MTMD_HELPER_GEN_AUDIO_OUT_AUTO) {
+            mode = MTMD_HELPER_GEN_AUDIO_OUT_AUDIO;
+        }
+        if (!can_speak() && mode != MTMD_HELPER_GEN_AUDIO_OUT_TEXT && mode != MTMD_HELPER_GEN_AUDIO_OUT_AUTO) {
+            send_error("response.create: the model cannot generate audio, start the server with --voice-model");
             return;
         }
         if (!deps.cap.text_gen && mode != MTMD_HELPER_GEN_AUDIO_OUT_AUDIO && mode != MTMD_HELPER_GEN_AUDIO_OUT_AUTO) {
@@ -1519,9 +1566,16 @@ struct realtime_conversation {
             send_error("response.create: max_output_tokens must be an integer or \"inf\"");
             return;
         }
-        // an audio response carries its transcript: the model speaks interleaved with the text it says
+        // an audio response carries its transcript: the model speaks interleaved with the text it says, or a voice
+        // model speaks the text of the model
+        const bool use_voice       = deps.voices && (mode == MTMD_HELPER_GEN_AUDIO_OUT_AUDIO || mode == MTMD_HELPER_GEN_AUDIO_OUT_MIXED);
         const bool with_transcript = mode == MTMD_HELPER_GEN_AUDIO_OUT_AUDIO && deps.cap.text_gen;
-        response.out_mode = with_transcript ? MTMD_HELPER_GEN_AUDIO_OUT_MIXED : mode;
+        response.out_mode = use_voice ? MTMD_HELPER_GEN_AUDIO_OUT_TEXT : with_transcript ? MTMD_HELPER_GEN_AUDIO_OUT_MIXED : mode;
+        int resp_voice_model = 0;
+        std::string resp_voice_name;
+        if (use_voice) {
+            resp_voice_model = std::max(0, deps.voices->find(voice == "default" ? "" : voice, resp_voice_name));
+        }
 
         // the output goes through the parser of the chat template: content, reasoning and tool calls (with their grammar)
         std::optional<common_chat_session> chat;
@@ -1553,6 +1607,18 @@ struct realtime_conversation {
             transcript_mode = with_transcript;
             out_samples     = 0;
             out_audio.clear();
+            voice_resp    = use_voice;
+            voice_model   = resp_voice_model;
+            voice_name    = resp_voice_name;
+            segmenter     = server_voice_segmenter();
+            voice_text    = 0;
+            voice_pending = 0;
+            voice_frames  = 0;
+            llm_done      = false;
+            held_done.reset();
+            voice_cancel  = std::make_shared<std::atomic<bool>>(false);
+            voice_segments.clear();
+            voice_sent    = 0;
             parts       = json::array();
             idx_text    = -1;
             idx_audio   = -1;
@@ -1563,7 +1629,7 @@ struct realtime_conversation {
             if (chat) {
                 parse.emplace(std::move(*chat));
             }
-            out_rs.reset(model_out_rate, out_fmt.rate);
+            out_rs.reset(use_voice ? deps.voices->models()[resp_voice_model].sample_rate : model_out_rate, out_fmt.rate);
             resp_oob      = oob;
             response_meta = {
                 {"conversation_id",   oob ? json(nullptr) : json(conv_id)},
@@ -1571,7 +1637,7 @@ struct realtime_conversation {
                 {"max_output_tokens", max_output_tokens_json(response.n_predict)},
                 {"metadata",          resp.value("metadata", json(nullptr))},
             };
-            if (deps.cap.audio_gen) {
+            if (can_speak()) {
                 response_meta["audio"] = {{"output", {{"format", out_fmt.to_json()}, {"voice", voice}}}};
             }
             send_event({{"type", "response.created"}, {"response", response_json("in_progress", nullptr, nullptr)}});
@@ -1803,6 +1869,7 @@ struct realtime_conversation {
         } else if (t == "response.create") {
             on_response_create(ev);
         } else if (t == "response.cancel") {
+            cancel_voice();
             control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
         } else {
             send_error("unknown event type: " + t);
@@ -1860,12 +1927,90 @@ struct realtime_conversation {
         return {{"response_id", response_id}, {"item_id", response_item_id}, {"output_index", idx_message}, {"content_index", idx}};
     }
 
+    // a voice speaks the transcript: its text up to `end` goes out when the audio of its piece starts (mutex held)
+    void send_transcript(size_t end) {
+        if (!transcript_mode || end <= voice_sent) {
+            return;
+        }
+        end = std::min(end, response_transcript.size());
+        if (idx_audio < 0) {
+            idx_audio = open_part(true);
+        }
+        json ev = part_base(idx_audio);
+        ev["type"]  = "response.output_audio_transcript.delta";
+        ev["delta"] = response_transcript.substr(voice_sent, end - voice_sent);
+        voice_sent = end;
+        send_event(ev);
+    }
+
+    void cancel_voice() {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (voice_cancel) {
+            voice_cancel->store(true);
+        }
+    }
+
+    // a piece of the response text goes to the voice model; its audio comes back on the worker thread
+    void speak(const server_voice_segmenter::piece & p) {
+        voice_segment seg;
+        seg.t0 = voice_text;
+        seg.t1 = voice_text + p.raw_len;
+        voice_text = seg.t1;
+        if (p.text.empty()) {
+            return;
+        }
+        const size_t idx = voice_segments.size();
+        voice_segments.push_back(seg);
+        voice_pending++;
+        voice_jobs++;
+        server_voice_job job;
+        job.text      = p.text;
+        job.voice     = voice_name;
+        job.cancelled = voice_cancel;
+        const std::string rid = response_id;
+        job.on_audio = [this, rid, idx](const float * pcm, size_t n) {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (rid != response_id || voice_cancel->load()) {
+                return;
+            }
+            if (voice_segments[idx].s0 < 0) {
+                voice_segments[idx].s0 = out_samples;
+                send_transcript(voice_segments[idx].t1);
+            }
+            on_audio(out_rs.process(pcm, n));
+            voice_segments[idx].s1 = out_samples;
+        };
+        job.on_done = [this, rid](bool, int32_t n_frames) {
+            std::lock_guard<std::mutex> lock(mutex);
+            voice_jobs--;
+            if (rid != response_id) {
+                return;
+            }
+            voice_pending--;
+            voice_frames += n_frames;
+            if (llm_done && voice_pending == 0 && held_done) {
+                const server_task_result_realtime res = *held_done;
+                held_done.reset();
+                finish_response(res);
+            }
+        };
+        deps.voices->submit(voice_model, std::move(job));
+    }
+
     void on_text(const std::string & text) {
+        if (voice_resp) {
+            for (const auto & p : segmenter.push(text)) {
+                speak(p);
+            }
+        }
         if (transcript_mode) {
             if (idx_audio < 0) {
                 idx_audio = open_part(true);
             }
             response_transcript += text;
+            if (voice_resp) {
+                return; // it goes out with the audio, see send_transcript()
+            }
             json ev = part_base(idx_audio);
             ev["type"]  = "response.output_audio_transcript.delta";
             ev["delta"] = text;
@@ -1976,8 +2121,30 @@ struct realtime_conversation {
         if (!res.response_done) {
             return;
         }
+        if (voice_resp) {
+            // the model is done, the voice may still speak: the response ends with the audio of the last piece
+            speak(segmenter.flush());
+            llm_done = true;
+            if (voice_pending > 0) {
+                held_done = res;
+                return;
+            }
+        }
+        finish_response(res);
+    }
+
+    // the end of a response: done events, the items of the conversation, response.done (mutex held)
+    void finish_response(const server_task_result_realtime & res_in) {
+        server_task_result_realtime res = res_in;
+        res.n_out_audio += voice_frames;
+        if (voice_resp && voice_cancel && voice_cancel->load()) {
+            res.cancelled = true;
+        }
         if (idx_audio >= 0) {
             on_audio(out_rs.flush());
+        }
+        if (voice_resp && !(voice_cancel && voice_cancel->load())) {
+            send_transcript(response_transcript.size()); // the text no piece spoke
         }
 
         std::string status       = "completed";
@@ -2039,6 +2206,11 @@ struct realtime_conversation {
             it.item        = output[i];
             it.response_id = response_id;
             if ((int) i == idx_message) {
+                for (const auto & seg : voice_segments) {
+                    if (seg.s1 > 0) {
+                        it.spoken.emplace_back(seg.s1, (int64_t) seg.t1);
+                    }
+                }
                 it.audio_samples = out_samples;
                 it.audio_rate    = out_fmt.rate;
                 it.audio         = out_audio;
@@ -2049,6 +2221,7 @@ struct realtime_conversation {
         send_event({{"type", "response.done"}, {"response", response_json(status, details, usage_json(res))}});
         responding     = false;
         response_ended = true;
+        voice_resp     = false;
         // the context window of the conversation stands in for the token budget
         send_event({{"type", "rate_limits.updated"}, {"rate_limits", json::array({{
             {"name", "tokens"}, {"limit", res.n_ctx}, {"remaining", std::max(0, res.n_ctx - res.n_past)}, {"reset_seconds", 0},
@@ -2134,6 +2307,17 @@ struct realtime_conversation {
         reader.join();
         for (auto & t : transcribers) {
             t.join();
+        }
+        // the voice jobs call back into the session: stop them and wait until each one is done
+        cancel_voice();
+        while (true) {
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                if (voice_jobs == 0) {
+                    break;
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
 };
@@ -2432,7 +2616,8 @@ bool server_realtime_slot::rollback(const std::string & name) {
 }
 
 bool server_realtime_slot::update() {
-    llama_set_embeddings(ctx, true);
+    // the hidden states drive the audio of a model that speaks itself; a text model needs no embeddings
+    llama_set_embeddings(ctx, gen.valid());
 
     if (responding) {
         return response_step();
