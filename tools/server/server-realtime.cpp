@@ -2340,6 +2340,7 @@ server_realtime_slot::server_realtime_slot(llama_context * ctx, mtmd_context * m
     if (mtmd_gen_audio_get_info(mctx).type != MTMD_GEN_AUDIO_TYPE_NONE) {
         gen.init(ctx, mctx);
     }
+    streaming = mtmd_support_audio_stream(mctx);
 }
 
 void server_realtime_slot::push(server_realtime_op && op) {
@@ -2433,6 +2434,42 @@ bool server_realtime_slot::audio_rows() {
             return false;
         }
     }
+}
+
+// encodes the audio of a turn in one go, for models without an audio stream: the media chunks of mtmd carry the
+// model's own audio markers and split long audio as its encoder needs
+bool server_realtime_slot::audio_whole() {
+    std::vector<float> pcm = std::move(turn_pcm);
+    turn_pcm.clear();
+    if (pcm.empty()) {
+        return true;
+    }
+    mtmd::bitmap bmp(mtmd_bitmap_init_from_audio(pcm.size(), pcm.data()));
+    if (!bmp.ptr) {
+        return fail("failed to load the audio of the turn");
+    }
+    mtmd::input_chunks    chunks(mtmd_input_chunks_init());
+    const mtmd_input_part part     = { nullptr, bmp.ptr.get() };
+    const mtmd_input_part * parts[] = { &part };
+    if (mtmd_tokenize_from_parts(mctx, chunks.ptr.get(), parts, 1, false) != 0) {
+        return fail("failed to tokenize the audio of the turn");
+    }
+    if (n_past + mtmd_helper_get_n_pos(chunks.ptr.get()) >= n_ctx) {
+        return fail("the conversation does not fit in the context", ERROR_TYPE_EXCEED_CONTEXT_SIZE);
+    }
+    int32_t n_rows = 0;
+    for (size_t i = 0; i < chunks.size(); i++) {
+        if (mtmd_input_chunk_get_type(chunks[i]) == MTMD_INPUT_CHUNK_TYPE_AUDIO) {
+            n_rows += (int32_t) mtmd_input_chunk_get_n_tokens(chunks[i]);
+        }
+    }
+    llama_pos new_n_past = n_past;
+    if (mtmd_helper_eval_chunks(mctx, ctx, chunks.ptr.get(), n_past, seq_id, llama_n_batch(ctx), false, &new_n_past) != 0) {
+        return fail("failed to encode the audio of the turn");
+    }
+    n_past   = new_n_past;
+    n_audio += n_rows;
+    return true;
 }
 
 // samples the next text token of a response from the logits of the slot's own last decode; several slots
@@ -2611,6 +2648,7 @@ bool server_realtime_slot::rollback(const std::string & name) {
     n_audio    = it->n_audio;
     n_prev_end = it->n_prev_end;
     stream.reset();
+    turn_pcm.clear();
     marks.erase(it, marks.end());
     return true;
 }
@@ -2636,6 +2674,10 @@ bool server_realtime_slot::update() {
                 } break;
             case SERVER_CONTROL_ACTION_AUDIO_APPEND:
                 {
+                    if (!streaming) {
+                        turn_pcm.insert(turn_pcm.end(), op.audio.begin(), op.audio.end());
+                        break;
+                    }
                     if (!stream) {
                         stream.reset(mtmd_audio_stream_init(mctx, mtmd_audio_stream_params_default()));
                         if (!stream) {
@@ -2651,6 +2693,9 @@ bool server_realtime_slot::update() {
             case SERVER_CONTROL_ACTION_AUDIO_END:
                 {
                     // the end of the audio of a turn
+                    if (!streaming && !audio_whole()) {
+                        return false;
+                    }
                     if (stream) {
                         mtmd_audio_stream_flush(stream.get(), true);
                         if (!audio_rows()) {
@@ -2669,6 +2714,7 @@ bool server_realtime_slot::update() {
                 {
                     llama_memory_seq_rm(llama_get_memory(ctx), seq_id, -1, -1);
                     stream.reset();
+                    turn_pcm.clear();
                     marks.clear();
                     n_past     = 0;
                     n_audio    = 0;

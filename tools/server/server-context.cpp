@@ -6252,10 +6252,11 @@ void server_routes::init_routes() {
             });
         };
 
-        // models that answer after the audio hold a conversation, see server-realtime.h
+        // chat models with audio input hold a conversation, see server-realtime.h; without an audio stream the
+        // audio of a turn is encoded when it ends
         // live transcription: Voxtral Realtime (no chat), or an "asr" model in a session opened with ?intent=transcription
         const bool live_asr = !ctx_server.asr_prompt.empty() && req.get_param("intent") == "transcription";
-        if (ctx_server.mtmd_cap.audio_stream && ctx_server.mtmd_cap.chat && !live_asr) {
+        if ((ctx_server.mtmd_cap.audio_stream || ctx_server.mtmd_cap.audio) && ctx_server.mtmd_cap.chat && !live_asr) {
             server_realtime_conversation({queue_tasks, queue_results, *meta, params.sampling, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab,
                                           ctx_server.vad_model, ctx_server.turn_model, ctx_server.voices,
                                           meta->chat_params.allow_audio ? realtime_transcribe : nullptr}, conn);
