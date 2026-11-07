@@ -3974,6 +3974,7 @@ struct mtmd_audio_stream {
     std::vector<float> embd;    // pending audio embeddings
     size_t embd_off = 0;        // rows of embd already consumed
     std::vector<float> out;     // rows of the last step
+    std::vector<llama_token> out_tok; // token ids of the rows of the last step, empty if the rows are embeddings
 
     int64_t n_rows = 0;         // rows produced so far
     int64_t n_rows_done = 0;    // audio rows whose text has been sampled, see mtmd_audio_stream_get_n_rows()
@@ -4069,13 +4070,17 @@ struct mtmd_audio_stream_lfm3a : mtmd_audio_stream {
 
 // Gemma 4 (E2B, E4B): the rows are plain audio embeddings of a chat turn, the model answers after the audio
 // like mtmd_audio_preprocessor_gemma4a, the audio is cut into 30 s segments, each encoded from a cold start
-// the markers <|audio> and <audio|> are not in the rows: as embeddings they would skip the token scale and the per-layer embeddings
+// the markers <|audio> and <audio|> go out as tokens: as embeddings they would skip the token scale and the per-layer embeddings
 struct mtmd_audio_stream_gemma4a : mtmd_audio_stream {
     int     win;              // samples per mel frame
     int64_t seg_len;          // samples per segment
     int64_t seg_start   = 0;  // absolute index of the first sample of the segment, n_frames counts its frames
     int64_t n_rows_segs = 0;  // audio rows of the finished segments
     clip_enc_state * enc_state = nullptr;
+    std::vector<llama_token> beg_tokens;
+    std::vector<llama_token> end_tokens;
+    bool beg_done = false;
+    bool end_done = false;
 
     ~mtmd_audio_stream_gemma4a() override {
         clip_enc_state_free(enc_state);
@@ -4157,6 +4162,10 @@ int32_t mtmd_audio_stream_step(mtmd_audio_stream * s, llama_token last_token) {
 
 const float * mtmd_audio_stream_get_output_embd(const mtmd_audio_stream * s) {
     return s->out.data();
+}
+
+const llama_token * mtmd_audio_stream_get_output_tokens(const mtmd_audio_stream * s) {
+    return s->out_tok.empty() ? nullptr : s->out_tok.data();
 }
 
 bool mtmd_audio_stream_is_seq_start(const mtmd_audio_stream * s) {
@@ -4698,6 +4707,11 @@ bool mtmd_audio_stream_gemma4a::init(const mtmd_audio_stream_params & params) {
     const int n_step  = (int) ((int64_t) params.step_ms * hparams->audio_sample_rate / 1000 / hop);
     n_step_mel = CLIP_ALIGN(std::max(n_step, n_block), n_block);
 
+    // the markers the tokenizer puts around an audio clip go around the stream as well
+    const llama_vocab * vocab = llama_model_get_vocab(ctx->text_model);
+    beg_tokens = mtmd_tokenizer::mtmd_tokenize_text_internal(vocab, ctx->aud_beg, false, true);
+    end_tokens = mtmd_tokenizer::mtmd_tokenize_text_internal(vocab, ctx->aud_end, false, true);
+
     enc_state = clip_enc_state_init(ctx_clip, n_step_mel);
     return enc_state != nullptr;
 }
@@ -4828,14 +4842,26 @@ int32_t mtmd_audio_stream_gemma4a::step(llama_token /* last_token */) {
     }
 
     // rows carry no text, all of them go out at once and last_token is not used
-    const int64_t n_out = (int64_t) (embd.size() / n_embd);
-    out.assign(embd.begin(), embd.end());
-    embd.clear();
+    // the markers go out in steps of their own, before the first and after the last audio rows
+    out.clear();
+    out_tok.clear();
+    const int64_t n_avail = (int64_t) (embd.size() / n_embd);
+    if (!beg_done && (n_avail > 0 || ended)) {
+        beg_done = true;
+        out_tok  = beg_tokens;
+    } else if (n_avail > 0) {
+        out.assign(embd.begin(), embd.end());
+        embd.clear();
+        n_rows_done += n_avail; // the markers are not audio rows
+    } else if (ended && !end_done) {
+        end_done = true;
+        out_tok  = end_tokens;
+    }
+    const int64_t n_out = out_tok.empty() ? (int64_t) (out.size() / n_embd) : (int64_t) out_tok.size();
     if (n_out == 0) {
         return ended ? -1 : 0;
     }
-    n_rows      += n_out;
-    n_rows_done += n_out;
+    n_rows += n_out;
     return (int32_t) n_out;
 }
 

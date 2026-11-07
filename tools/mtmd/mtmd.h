@@ -446,6 +446,10 @@ MTMD_API int32_t mtmd_audio_stream_step(mtmd_audio_stream * stream, llama_token 
 // rows of the last step, the reading size (in bytes) is n_rows * llama_model_n_embd_inp(model) * sizeof(float)
 MTMD_API const float * mtmd_audio_stream_get_output_embd(const mtmd_audio_stream * stream);
 
+// token ids of the rows of the last step, nullptr if the rows are embeddings
+// decode them as tokens: a model can treat a token differently from its embedding row (e.g. Gemma 4)
+MTMD_API const llama_token * mtmd_audio_stream_get_output_tokens(const mtmd_audio_stream * stream);
+
 // true if the rows of the last step start a new sequence: the caller drops its sequence before decoding them
 MTMD_API bool mtmd_audio_stream_is_seq_start(const mtmd_audio_stream * stream);
 
