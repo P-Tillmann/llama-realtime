@@ -42,8 +42,9 @@ struct server_realtime_deps {
                        int32_t & n_input, int32_t & n_output)> transcribe;
 };
 
-// a realtime conversation over websocket, for models that answer after the audio (e.g. LFM3-Audio):
-// the audio is prefilled as it arrives, responses follow output_modalities or the model's own switching
+// a realtime conversation over websocket, for chat models with audio input (e.g. LFM3-Audio, Gemma 4, Voxtral, Ultravox):
+// the audio is prefilled as it arrives if the model can stream it, otherwise at the end of the turn;
+// responses follow output_modalities or the model's own switching
 void server_realtime_conversation(const server_realtime_deps & deps, server_http_context::ws_conn & conn);
 
 // one control of a realtime conversation
@@ -109,7 +110,9 @@ private:
     };
     std::vector<mark> marks;
 
-    mtmd::audio_stream_ptr stream;   // the audio of the open turn
+    mtmd::audio_stream_ptr stream;   // the audio of the open turn, for models that take audio as it arrives
+    bool                   streaming = false; // false: the audio of a turn is held and encoded at its end
+    std::vector<float>     turn_pcm;  // the audio of the open turn, for models that take it whole
     mtmd_helper::gen_audio gen;      // set if the model generates audio
     std::vector<float>     h_state;  // hidden state that the gen-audio pipeline steps from
     common_sampler_ptr     smpl;
@@ -119,6 +122,7 @@ private:
     void send_result(std::string text, std::vector<float> audio, bool response_done = false);
     bool decode(const llama_token * tokens, const float * rows, int32_t n, bool logits_last);
     bool audio_rows();
+    bool audio_whole();
     void sample_next();
     std::string piece(llama_token tok) const;
     bool response_start(const server_realtime_op & op);
