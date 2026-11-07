@@ -19,6 +19,7 @@
 struct server_context_meta;
 struct server_vad_model;
 struct server_turn_model;
+class server_voices;
 struct common_params_sampling;
 struct mtmd_context;
 struct mtmd_helper_cap;
@@ -34,6 +35,7 @@ struct server_realtime_deps {
     const llama_vocab *            vocab;
     std::shared_ptr<server_vad_model>  vad_model;  // null: a level-based VAD
     std::shared_ptr<server_turn_model> turn_model; // null: semantic_vad ends turns by silence
+    std::shared_ptr<server_voices>     voices;     // null: audio output only from a model that speaks itself
 
     // transcribes PCM (mono, at rate) on another slot, with the token counts; false on error, null without audio input
     std::function<bool(const std::vector<float> & pcm, int rate, const std::string & language, std::string & text,

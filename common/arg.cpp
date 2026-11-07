@@ -834,7 +834,7 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
                 throw std::invalid_argument(string_format("error: invalid argument: %s", arg.c_str()));
             }
             if (!seen_args.insert(arg).second) {
-                const bool skip = (arg == "--spec-type");
+                const bool skip = (arg == "--spec-type" || arg == "--voice-model");
 
                 if (!skip) {
                     LOG_WRN("DEPRECATED: argument '%s' specified multiple times, use comma-separated values instead (only last value will be used)\n", arg.c_str());
@@ -1227,7 +1227,7 @@ bool common_params_to_map(int argc, char ** argv, llama_example ex, std::map<com
             throw std::invalid_argument(string_format("error: invalid argument: %s", arg.c_str()));
         }
         if (!seen_args.insert(arg).second) {
-            const bool skip = (arg == "--spec-type");
+            const bool skip = (arg == "--spec-type" || arg == "--voice-model");
 
             if (!skip) {
                 LOG_WRN("DEPRECATED: argument '%s' specified multiple times, use comma-separated values instead (only last value will be used)\n", arg.c_str());
@@ -2569,6 +2569,20 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.turn_model = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_TURN_MODEL"));
+    add_opt(common_arg(
+        {"--voice-model"}, "SPEC",
+        "text-to-speech models that speak the responses of /v1/realtime, e.g. one per language; several separated by ';'\n"
+        "or with the option repeated. SPEC: model=FILE,mmproj=FILE[,name=NAME][,lang=LANG][,voice=VOICE][,speaker=FILE]\n"
+        "sessions select one with session.audio.output.voice = NAME, VOICE or NAME/VOICE (default: the first)",
+        [](common_params & params, const std::string & value) {
+            std::stringstream ss(value);
+            for (std::string spec; std::getline(ss, spec, ';'); ) {
+                if (!spec.empty()) {
+                    params.voice_models.push_back(spec);
+                }
+            }
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}));
     add_opt(common_arg(
         {"-mmu", "--mmproj-url"}, "URL",
         "URL to a multimodal projector file. see tools/mtmd/README.md",

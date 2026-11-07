@@ -153,6 +153,7 @@ bool clip_encode(struct clip_ctx * ctx, struct clip_encode_params * params);
 // n_frames_max is the maximum number of encoder frames per call
 struct clip_enc_state * clip_enc_state_init(struct clip_ctx * ctx, int32_t n_frames_max);
 void                    clip_enc_state_free(struct clip_enc_state * state);
+void                    clip_enc_state_reset(struct clip_enc_state * state); // back to a cold start
 
 // per-sequence state of audio generation: RNG and the slots kept between GEN_WAV calls
 // seed UINT32_MAX means random; reset() clears the slots and keeps the RNG stream

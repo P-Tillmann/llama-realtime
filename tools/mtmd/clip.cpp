@@ -1154,7 +1154,7 @@ static std::unique_ptr<clip_graph> clip_get_graph_builder(clip_ctx * ctx, const 
             } break;
         case PROJECTOR_TYPE_GEMMA4A:
             {
-                builder = std::make_unique<clip_graph_gemma4a>(ctx, img);
+                builder = std::make_unique<clip_graph_gemma4a>(ctx, img, params && params->enc_state);
             } break;
         case PROJECTOR_TYPE_GEMMA4UA:
             {
@@ -5628,7 +5628,7 @@ bool clip_image_batch_encode(clip_ctx * ctx, int n_threads, const clip_image_f32
     return clip_encode(ctx, &params);
 }
 
-// persisted state slots of the gen-audio decoders and the streaming audio encoders
+// persisted state slots of the gen-audio decoders
 static std::vector<c2w_state_slot> list_gen_state_slots(const clip_hparams & hparams, const clip_model & model) {
     switch (model.proj_type) {
         case PROJECTOR_TYPE_QWEN3TTS_GEN:  return list_c2w_state_slots(hparams, model);
@@ -5636,6 +5636,15 @@ static std::vector<c2w_state_slot> list_gen_state_slots(const clip_hparams & hpa
         case PROJECTOR_TYPE_POCKETTTS_GEN: return list_pockettts_state_slots(hparams, model);
         case PROJECTOR_TYPE_LFM3A_GEN:     return list_lfm3a_gen_state_slots(hparams, model);
         default:                           return {};
+    }
+}
+
+// persisted state slots of the streaming audio encoders, empty if the encoder has none
+static std::vector<c2w_state_slot> list_enc_state_slots(const clip_hparams & hparams, const clip_model & model) {
+    switch (model.proj_type) {
+        case PROJECTOR_TYPE_LFM3A:   return list_lfm3a_state_slots(hparams, model);
+        case PROJECTOR_TYPE_GEMMA4A: return list_gemma4a_state_slots(hparams, model);
+        default:                     return {};
     }
 }
 
@@ -5698,9 +5707,9 @@ const std::map<std::string, clip_gen_voice> & clip_gen_get_voices(const clip_ctx
 
 clip_enc_state * clip_enc_state_init(clip_ctx * ctx, int32_t n_frames_max) {
     const auto & hparams = ctx->model.hparams;
-    if (ctx->proj_type() == PROJECTOR_TYPE_LFM3A) {
-        // downsampler context, short-conv taps and attention window, see list_lfm3a_state_slots()
-        const auto slots = list_lfm3a_state_slots(hparams, ctx->model);
+    // downsampler context, short-conv taps and attention window, see list_enc_state_slots()
+    const auto slots = list_enc_state_slots(hparams, ctx->model);
+    if (!slots.empty()) {
         auto st = std::make_unique<clip_enc_state>();
         ggml_init_params params = {
             /*.mem_size   =*/ ggml_tensor_overhead() * slots.size(),
@@ -5768,6 +5777,13 @@ clip_enc_state * clip_enc_state_init(clip_ctx * ctx, int32_t n_frames_max) {
 
 void clip_enc_state_free(clip_enc_state * state) {
     delete state;
+}
+
+void clip_enc_state_reset(clip_enc_state * state) {
+    ggml_backend_buffer_clear(state->buf.get(), 0);
+    std::fill(state->slot_pos.begin(), state->slot_pos.end(), -1);
+    state->stem_tail.clear();
+    state->n_past = 0;
 }
 
 size_t clip_cbx_read_tensor(struct clip_ctx * ctx, const char * name, float * out, size_t n_max) {
@@ -7168,6 +7184,15 @@ bool clip_encode(struct clip_ctx * ctx, struct clip_encode_params * params) {
                 const int context_size = chunk_size + max_past;
                 const int num_blocks   = (n_pos + chunk_size - 1) / chunk_size;
 
+                // streaming: the state holds the positions before this call, n_past of them are valid
+                const int n_past = params->enc_state ? params->enc_state->n_past : 0;
+                if (params->enc_state != nullptr) {
+                    size_t i = 0;
+                    for (const auto & slot : list_gemma4a_state_slots(hparams, model)) {
+                        ggml_backend_tensor_copy(params->enc_state->slots[i++], get_inp_tensor(("state_in_" + slot.name).c_str()));
+                    }
+                }
+
                 // Blocked causal attention mask: [context_size, chunk_size, num_blocks]
                 {
                     std::vector<float> mask(context_size * chunk_size * num_blocks, -1e9f);
@@ -7176,7 +7201,7 @@ bool clip_encode(struct clip_ctx * ctx, struct clip_encode_params * params) {
                             int gq = b * chunk_size + q;
                             for (int k = 0; k < context_size; k++) {
                                 int gk = b * chunk_size - max_past + k;
-                                if (gq < n_pos && gk >= 0 && gk < n_pos && gk <= gq && (gq - gk) < max_past) {
+                                if (gq < n_pos && gk >= -n_past && gk < n_pos && gk <= gq && (gq - gk) < max_past) {
                                     mask[k + q * context_size + b * context_size * chunk_size] = 0.0f;
                                 }
                             }
@@ -7821,13 +7846,17 @@ bool clip_encode(struct clip_ctx * ctx, struct clip_encode_params * params) {
             }
         }
     }
-    if (params->enc_state != nullptr && model.proj_type == PROJECTOR_TYPE_LFM3A) {
+    if (params->enc_state != nullptr && !params->enc_state->slots.empty()) {
         const auto & slots = params->enc_state->slots;
         size_t i = 0;
-        for (const auto & slot : list_lfm3a_state_slots(hparams, model)) {
+        for (const auto & slot : list_enc_state_slots(hparams, model)) {
             ggml_tensor * t = ggml_graph_get_tensor(gf, ("state_out_" + slot.name).c_str());
             GGML_ASSERT(t != nullptr);
             copy_gen_state_out(t, slots[i++]);
+        }
+        // lfm3a keeps its position in the "pos" slot
+        if (model.proj_type == PROJECTOR_TYPE_GEMMA4A) {
+            params->enc_state->n_past += clip_n_output_tokens(ctx, &imgs.entries[0]);
         }
     } else if (params->enc_state != nullptr && model.proj_type == PROJECTOR_TYPE_NEMOTRON_TRANSCRIBE) {
         clip_enc_state * st = params->enc_state;
