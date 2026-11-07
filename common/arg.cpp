@@ -2584,6 +2584,15 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER}));
     add_opt(common_arg(
+        {"--asr-model"}, "SPEC",
+        "speech-to-text model of /v1/realtime: it transcribes the user audio for a model without audio input (cascade)\n"
+        "SPEC: model=FILE,mmproj=FILE[,lang=LANG]; with an audio stream and an \"asr\" chat template it transcribes\n"
+        "while the user speaks, other audio models transcribe at the end of the turn",
+        [](common_params & params, const std::string & value) {
+            params.asr_model = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}));
+    add_opt(common_arg(
         {"-mmu", "--mmproj-url"}, "URL",
         "URL to a multimodal projector file. see tools/mtmd/README.md",
         [](common_params & params, const std::string & value) {

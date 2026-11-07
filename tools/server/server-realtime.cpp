@@ -5,6 +5,7 @@
 #include "server-task.h"
 #include "server-turn.h"
 #include "server-voice.h"
+#include "server-asr.h"
 
 #include "base64.hpp"
 #include "chat.h"
@@ -20,6 +21,7 @@
 #include <cmath>
 #include <cstring>
 #include <functional>
+#include <future>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -31,6 +33,9 @@
 // one slot holds the conversation for the whole session: text and audio go into it as they arrive, so a response
 // starts right after the last audio. session.type "realtime" holds a conversation, "transcription" transcribes each
 // committed audio buffer on its own.
+//
+// cascade: a model without audio input hears through the ASR model (--asr-model), the transcript of each user audio
+// item goes into the conversation as its text; a voice model (--voice-model) speaks the responses.
 //
 
 namespace {
@@ -428,6 +433,7 @@ struct realtime_conversation {
         json                 item;        // as the client sees it
         std::string          text;        // user text, tool output
         std::vector<float>   pcm;         // user audio at the model rate
+        std::string          transcript;  // cascade: the text of the user audio, what the conversation holds
         std::string          response_id; // assistant items of one response go in together
         std::vector<std::pair<int64_t, int64_t>> spoken; // assistant audio of a voice: (end sample, end of its text) per piece
         int64_t              audio_samples = 0; // assistant audio sent, at audio_rate
@@ -443,6 +449,7 @@ struct realtime_conversation {
     turn_state  pending_before;
     bool        audio_open = false;    // the input audio buffer has an item mark
     std::vector<float> pending_pcm;    // audio of the uncommitted buffer, at the model rate
+    std::shared_ptr<server_asr_turn> asr_turn; // cascade: the transcription of the uncommitted buffer
     std::string resp_mark;             // mark and turn state at the start of the response in progress
     turn_state  resp_before;
     bool        resp_oob = false;      // conversation "none": the response stays out of the conversation (guarded by mutex)
@@ -518,6 +525,17 @@ struct realtime_conversation {
             {"type",  "error"},
             {"error", {{"type", type_err}, {"code", nullptr}, {"message", message}, {"param", nullptr}}},
         });
+    }
+
+    // audio input through the ASR model: the model does not hear itself
+    bool cascade() const {
+        return deps.asr && !deps.cap.audio;
+    }
+
+    // language of the transcription: of audio.input.transcription, else of a transcription session
+    std::string asr_language() const {
+        const std::string l = transcription.is_object() ? json_value(transcription, "language", std::string()) : std::string();
+        return l.empty() ? language : l;
     }
 
     // audio output: from a voice model if one is configured, else from a model that speaks itself
@@ -773,6 +791,20 @@ struct realtime_conversation {
             case conv_item::USER_TEXT:
                 return ensure_turn() && control(SERVER_CONTROL_ACTION_TEXT_APPEND, it.text);
             case conv_item::USER_AUDIO:
+                if (cascade()) {
+                    // the conversation holds what was said, the audio of a client item is transcribed first
+                    if (it.transcript.empty() && !it.pcm.empty()) {
+                        int32_t n_in = 0, n_out = 0;
+                        if (!deps.asr->transcribe(it.pcm, asr_language(), it.transcript, n_in, n_out)) {
+                            send_error("the transcription of the audio failed", "server_error");
+                            return false;
+                        }
+                        if (!it.item.is_null()) {
+                            it.item["content"][0]["transcript"] = it.transcript;
+                        }
+                    }
+                    return ensure_turn() && control(SERVER_CONTROL_ACTION_TEXT_APPEND, it.transcript);
+                }
                 if (!ensure_turn() || (!it.pcm.empty() && !control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, it.pcm))) {
                     return false;
                 }
@@ -858,6 +890,9 @@ struct realtime_conversation {
         }
         audio_open = true;
         pending_pcm.clear();
+        if (cascade()) {
+            asr_turn = deps.asr->open(asr_language());
+        }
         return true;
     }
 
@@ -869,7 +904,9 @@ struct realtime_conversation {
             return false;
         }
         pending_pcm.insert(pending_pcm.end(), samples.begin(), samples.end());
-        if (!control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, std::move(samples))) {
+        if (asr_turn) {
+            deps.asr->push(asr_turn, std::move(samples));
+        } else if (!control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, std::move(samples))) {
             return false;
         }
         has_audio = true;
@@ -938,7 +975,27 @@ struct realtime_conversation {
             send_error("input_audio_buffer.commit: the buffer is empty", "input_audio_buffer_commit_empty");
             return false;
         }
-        if (!append_audio(in_rs.flush()) || !control(SERVER_CONTROL_ACTION_AUDIO_END)) {
+        if (!append_audio(in_rs.flush())) {
+            return false;
+        }
+        // cascade: the turn has its text when the ASR model is done, the client events after the commit wait for it
+        std::string asr_text;
+        int32_t     asr_in = 0, asr_out = 0;
+        bool        asr_ok = true;
+        if (asr_turn) {
+            std::promise<bool> done;
+            deps.asr->finish(asr_turn, [&](bool ok, const std::string & text, int32_t n_in, int32_t n_out) {
+                asr_text = text;
+                asr_in   = n_in;
+                asr_out  = n_out;
+                done.set_value(ok);
+            });
+            asr_ok = done.get_future().get();
+            asr_turn.reset();
+            if (!control(SERVER_CONTROL_ACTION_TEXT_APPEND, asr_text)) {
+                return false;
+            }
+        } else if (!control(SERVER_CONTROL_ACTION_AUDIO_END)) {
             return false;
         }
         has_audio  = false;
@@ -962,6 +1019,10 @@ struct realtime_conversation {
         }
         it.item   = {{"id", it.id}, {"type", "message"}, {"status", "completed"}, {"role", "user"},
                      {"content", json::array({{{"type", "input_audio"}, {"transcript", nullptr}}})}};
+        if (cascade()) {
+            it.transcript = asr_text;
+            it.item["content"][0]["transcript"] = asr_text;
+        }
         pending_pcm.clear();
         speech_item_id.clear();
         {
@@ -972,44 +1033,79 @@ struct realtime_conversation {
         const std::string id = it.id;
         std::vector<float> pcm = it.pcm;
         add_item(std::move(it));
-        transcribe_item(id, std::move(pcm));
+        if (cascade()) {
+            if (type == "realtime" && !transcription.is_null()) {
+                std::lock_guard<std::mutex> lock(mutex);
+                send_transcription(id, asr_ok, asr_text, asr_in, asr_out);
+            }
+        } else {
+            transcribe_item(id, std::move(pcm));
+        }
         return true;
     }
 
-    // audio.input.transcription: the user audio is transcribed on another slot, the conversation does not wait for it
+    // the transcription events of a user audio item, with the mutex held
+    void send_transcription(const std::string & id, bool ok, const std::string & text, int32_t n_in, int32_t n_out) {
+        if (!ok) {
+            send_event({{"type", "conversation.item.input_audio_transcription.failed"}, {"item_id", id}, {"content_index", 0},
+                        {"error", {{"type", "transcription_error"}, {"code", nullptr}, {"message", "transcription failed"}, {"param", nullptr}}}});
+            return;
+        }
+        const int i = find_item(id);
+        if (i >= 0) {
+            items[i].item["content"][0]["transcript"] = text;
+        }
+        send_event({{"type", "conversation.item.input_audio_transcription.delta"}, {"item_id", id}, {"content_index", 0}, {"delta", text}});
+        // the audio embeddings of the prompt are not counted apart, the text of the ASR prompt is small
+        send_event({{"type", "conversation.item.input_audio_transcription.completed"}, {"item_id", id}, {"content_index", 0},
+                    {"transcript", text},
+                    {"usage", {{"type", "tokens"}, {"total_tokens", n_in + n_out}, {"input_tokens", n_in}, {"output_tokens", n_out},
+                               {"input_token_details", {{"text_tokens", 0}, {"audio_tokens", n_in}}}}}});
+    }
+
+    // audio.input.transcription: the user audio is transcribed by the ASR model or on another slot, the conversation
+    // does not wait for it
     void transcribe_item(const std::string & id, std::vector<float> pcm) {
-        if (type != "realtime" || transcription.is_null() || !deps.transcribe) {
+        const bool by_asr = deps.asr && deps.asr->sample_rate() == model_in_rate;
+        if (type != "realtime" || transcription.is_null() || (!by_asr && !deps.transcribe)) {
             return;
         }
         const std::string lang = json_value(transcription, "language", std::string());
-        transcribers.emplace_back([this, id, lang, pcm = std::move(pcm)]() {
+        transcribers.emplace_back([this, id, lang, by_asr, pcm = std::move(pcm)]() {
             std::string text;
             int32_t n_in = 0, n_out = 0;
-            const bool ok = deps.transcribe(pcm, model_in_rate, lang, text, n_in, n_out);
+            const bool ok = by_asr ? deps.asr->transcribe(pcm, lang, text, n_in, n_out) :
+                                     deps.transcribe(pcm, model_in_rate, lang, text, n_in, n_out);
             if (closed) {
                 return;
             }
             std::lock_guard<std::mutex> lock(mutex);
-            if (!ok) {
-                send_event({{"type", "conversation.item.input_audio_transcription.failed"}, {"item_id", id}, {"content_index", 0},
-                            {"error", {{"type", "transcription_error"}, {"code", nullptr}, {"message", "transcription failed"}, {"param", nullptr}}}});
-                return;
-            }
-            const int i = find_item(id);
-            if (i >= 0) {
-                items[i].item["content"][0]["transcript"] = text;
-            }
-            send_event({{"type", "conversation.item.input_audio_transcription.delta"}, {"item_id", id}, {"content_index", 0}, {"delta", text}});
-            // the audio embeddings of the prompt are not counted apart, the text of the ASR prompt is small
-            send_event({{"type", "conversation.item.input_audio_transcription.completed"}, {"item_id", id}, {"content_index", 0},
-                        {"transcript", text},
-                        {"usage", {{"type", "tokens"}, {"total_tokens", n_in + n_out}, {"input_tokens", n_in}, {"output_tokens", n_out},
-                                   {"input_token_details", {{"text_tokens", 0}, {"audio_tokens", n_in}}}}}});
+            send_transcription(id, ok, text, n_in, n_out);
         });
     }
 
     void on_commit() {
         if (!commit() || type != "transcription") {
+            return;
+        }
+        if (cascade()) {
+            // the ASR model has transcribed the buffer already, the slot only holds the turn header
+            std::string id, text;
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                if (!items.empty()) {
+                    id   = items.back().id;
+                    text = items.back().transcript;
+                }
+            }
+            control(SERVER_CONTROL_ACTION_CLEAR);
+            turn_open = false;
+            n_turns   = 0;
+            std::lock_guard<std::mutex> lock(mutex);
+            send_event({{"type", "conversation.item.input_audio_transcription.delta"}, {"item_id", id}, {"content_index", 0}, {"delta", text}});
+            send_event({{"type", "conversation.item.input_audio_transcription.completed"}, {"item_id", id}, {"content_index", 0},
+                        {"transcript", text}});
+            items.clear();
             return;
         }
         // transcription: the committed audio is transcribed on its own, then the slot is cleared for the next one
@@ -1266,6 +1362,10 @@ struct realtime_conversation {
         audio_open = false;
         has_audio  = false;
         pending_pcm.clear();
+        if (asr_turn) {
+            deps.asr->cancel(asr_turn);
+            asr_turn.reset();
+        }
         speech_item_id.clear();
         in_rs.reset(in_fmt.rate, model_in_rate);
         if (detector && turn_params) {
@@ -1393,9 +1493,16 @@ struct realtime_conversation {
         if (put_item(it)) {
             const std::string id = it.id;
             std::vector<float> pcm = it.kind == conv_item::USER_AUDIO ? it.pcm : std::vector<float>();
+            const std::string text = it.transcript;
             add_item(std::move(it));
-            if (!pcm.empty()) {
+            if (pcm.empty()) {
+                return;
+            }
+            if (!cascade()) {
                 transcribe_item(id, std::move(pcm));
+            } else if (type == "realtime" && !transcription.is_null()) {
+                std::lock_guard<std::mutex> lock(mutex);
+                send_transcription(id, true, text, 0, 0); // put_item transcribed it
             }
         }
     }
@@ -2234,7 +2341,7 @@ struct realtime_conversation {
     //
 
     void run() {
-        model_in_rate = mtmd_get_audio_sample_rate(deps.mctx);
+        model_in_rate = cascade() ? deps.asr->sample_rate() : deps.mctx ? mtmd_get_audio_sample_rate(deps.mctx) : 16000;
         if (deps.cap.audio_gen) {
             model_out_rate = mtmd_gen_audio_get_info(deps.mctx).sample_rate;
         }
@@ -2305,6 +2412,10 @@ struct realtime_conversation {
         closed = true;
         conn.close();
         reader.join();
+        if (asr_turn) {
+            deps.asr->cancel(asr_turn); // its sequence of the ASR model is free again
+            asr_turn.reset();
+        }
         for (auto & t : transcribers) {
             t.join();
         }
@@ -2337,10 +2448,10 @@ server_realtime_slot::server_realtime_slot(llama_context * ctx, mtmd_context * m
                                            const common_params_sampling & sampling, server_response & queue_results, int id_task, int index)
     : ctx(ctx), model(llama_get_model(ctx)), vocab(llama_model_get_vocab(llama_get_model(ctx))), mctx(mctx), seq_id(seq_id),
       n_ctx(n_ctx), sampling(sampling), queue_results(queue_results), id_task(id_task), index(index) {
-    if (mtmd_gen_audio_get_info(mctx).type != MTMD_GEN_AUDIO_TYPE_NONE) {
+    if (mctx && mtmd_gen_audio_get_info(mctx).type != MTMD_GEN_AUDIO_TYPE_NONE) {
         gen.init(ctx, mctx);
     }
-    streaming = mtmd_support_audio_stream(mctx);
+    streaming = mctx && mtmd_support_audio_stream(mctx);
 }
 
 void server_realtime_slot::push(server_realtime_op && op) {
