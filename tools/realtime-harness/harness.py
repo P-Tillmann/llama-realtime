@@ -94,6 +94,8 @@ async def run_scenario(sc: dict, target: str, url: str, model: str, timeout: flo
         if not key:
             raise SystemExit("OPENAI_API_KEY is empty")
         headers["Authorization"] = f"Bearer {key}"
+    elif os.environ.get("LOCAL_API_KEY"):
+        headers["Authorization"] = f"Bearer {os.environ['LOCAL_API_KEY']}"  # e.g. a gateway in front of llama-server
     t0 = time.monotonic()
     proxy = None if target == "local" else True  # local server: never through an HTTPS proxy
     async with websockets.connect(url, additional_headers=headers, max_size=None, proxy=proxy) as ws:

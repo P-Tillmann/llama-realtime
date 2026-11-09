@@ -389,6 +389,7 @@ struct realtime_conversation {
     std::unique_ptr<server_turn_detector> detector;        // owned by the reader thread
     std::string                           speech_item_id;  // the user item of the speech in progress
     std::atomic<bool>                     responding{false};
+    std::atomic<bool>                     cancel_sent{false};   // the response in progress was cancelled, it ends soon
     std::atomic<bool>                     response_ended{false}; // for the idle timeout of the detector
 
     pcm_resampler in_rs;  // client rate -> model rate, owned by the reader thread
@@ -938,6 +939,7 @@ struct realtime_conversation {
                         speech_item_id = "item_" + random_string();
                         if (turn_params->interrupt_response && responding) {
                             cancel_voice();
+                            cancel_sent = true;
                             control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
                         }
                         send_event({{"type", "input_audio_buffer.speech_started"}, {"audio_start_ms", a.audio_ms},
@@ -1128,17 +1130,56 @@ struct realtime_conversation {
         items.clear();
     }
 
-    // edits of the conversation wait for the response in progress and the input audio buffer
-    bool can_edit(const std::string & what) {
+    // a client that interrupts the assistant cancels the response and truncates it right after: the cancelled
+    // response ends within a few frames (its item is in the conversation then), the edit waits for it
+    void wait_cancelled_response() {
+        for (int i = 0; i < 300 && responding && cancel_sent; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    }
+
+    // edits of the conversation wait for the response in progress and the input audio buffer; with_audio: the edit
+    // goes around the open buffer (edit_around_audio)
+    bool can_edit(const std::string & what, bool with_audio = false) {
+        wait_cancelled_response();
         if (responding) {
             send_error(what + ": a response is in progress, cancel it or wait for response.done");
             return false;
         }
-        if (audio_open) {
+        if (audio_open && !with_audio) {
             send_error(what + ": the input audio buffer has audio, commit or clear it first");
             return false;
         }
         return true;
+    }
+
+    // an edit while the user speaks (e.g. the truncate of an interrupted answer): the audio of the open buffer leaves
+    // the slot, the edit runs, then the buffer opens again after the edited conversation with the same audio
+    bool edit_around_audio(const std::function<bool()> & edit) {
+        if (!audio_open) {
+            return edit();
+        }
+        if (!control(SERVER_CONTROL_ACTION_ROLLBACK, pending_mark)) {
+            send_error("failed to edit the conversation", "server_error");
+            return false;
+        }
+        load_turn(pending_before);
+        audio_open = false;
+        std::vector<float> pcm = std::move(pending_pcm);
+        pending_pcm.clear();
+        auto asr = std::move(asr_turn); // cascade: the transcription of the buffer goes on as it is
+        asr_turn.reset();
+        const bool ok = edit();
+        if (!begin_item() || !ensure_turn()) {
+            return false;
+        }
+        audio_open  = true;
+        pending_pcm = std::move(pcm);
+        asr_turn    = std::move(asr);
+        if (!asr_turn && !pending_pcm.empty() && !control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, pending_pcm)) {
+            return false;
+        }
+        return ok;
     }
 
     int find_item(const std::string & id) {
@@ -1257,6 +1298,7 @@ struct realtime_conversation {
     }
 
     void on_item_delete(const json & ev) {
+        wait_cancelled_response();
         const std::string id = json_value(ev, "item_id", std::string());
         int i;
         {
@@ -1267,12 +1309,12 @@ struct realtime_conversation {
             send_error("conversation.item.delete: no item " + id);
             return;
         }
-        if (!can_edit("conversation.item.delete")) {
+        if (!can_edit("conversation.item.delete", true)) {
             return;
         }
-        const bool ok = rebuild(i, [&](std::vector<conv_item> & tail) {
+        const bool ok = edit_around_audio([&]() { return rebuild(i, [&](std::vector<conv_item> & tail) {
             tail.erase(std::remove_if(tail.begin(), tail.end(), [&](const conv_item & it) { return it.id == id; }), tail.end());
-        });
+        }); });
         if (ok) {
             send_event({{"type", "conversation.item.deleted"}, {"item_id", id}});
         }
@@ -1280,6 +1322,7 @@ struct realtime_conversation {
 
     // the assistant audio was heard up to audio_end_ms: the transcript keeps what was said before that
     void on_item_truncate(const json & ev) {
+        wait_cancelled_response();
         const std::string id    = json_value(ev, "item_id", std::string());
         const int         part  = json_value(ev, "content_index", 0);
         const int64_t     end_ms = json_value(ev, "audio_end_ms", (int64_t) -1);
@@ -1306,10 +1349,10 @@ struct realtime_conversation {
             send_error("conversation.item.truncate: audio_end_ms is beyond the audio of the item");
             return;
         }
-        if (!can_edit("conversation.item.truncate")) {
+        if (!can_edit("conversation.item.truncate", true)) {
             return;
         }
-        const bool ok = rebuild(i, [&](std::vector<conv_item> & tail) {
+        const bool ok = edit_around_audio([&]() { return rebuild(i, [&](std::vector<conv_item> & tail) {
             for (auto & it : tail) {
                 if (it.id != id) {
                     continue;
@@ -1344,7 +1387,7 @@ struct realtime_conversation {
                 const size_t bps = it.audio_fmt.type == "audio/pcm" ? 2 : 1;
                 it.audio.resize(std::min(it.audio.size(), (size_t) it.audio_samples * bps));
             }
-        });
+        }); });
         if (ok) {
             send_event({{"type", "conversation.item.truncated"}, {"item_id", id}, {"content_index", part}, {"audio_end_ms", end_ms}});
         }
@@ -1757,7 +1800,8 @@ struct realtime_conversation {
             resp_mark   = pending_mark;
             resp_before = pending_before;
         }
-        responding = true;
+        responding  = true;
+        cancel_sent = false;
         if (!control(SERVER_CONTROL_ACTION_RESPONSE_CREATE, prompt, {}, response)) {
             responding = false;
             return;
@@ -1977,6 +2021,7 @@ struct realtime_conversation {
             on_response_create(ev);
         } else if (t == "response.cancel") {
             cancel_voice();
+            cancel_sent = true;
             control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
         } else {
             send_error("unknown event type: " + t);

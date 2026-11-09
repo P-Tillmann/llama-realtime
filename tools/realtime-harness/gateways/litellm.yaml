@@ -1,0 +1,10 @@
+model_list:
+  - model_name: local-realtime
+    litellm_params:
+      model: openai/local
+      api_base: http://127.0.0.1:8080
+      api_key: none
+    model_info:
+      mode: realtime
+general_settings:
+  master_key: sk-spike-master

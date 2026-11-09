@@ -6207,6 +6207,7 @@ void server_routes::init_routes() {
                 inp["language"] = language;
             }
             json body = convert_transcriptions_to_chatcmpl(inp, meta->chat_params.tmpls.get(), in_files, files);
+            body["reasoning_effort"] = "none"; // a transcript, not an answer: a model that thinks (e.g. Gemma 4) would write its thoughts
             common_chat_session session;
             json parsed = oaicompat_chat_params_parse(ctx_server.vocab, body, meta->chat_params, files, session);
 
