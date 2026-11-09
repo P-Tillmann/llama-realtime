@@ -147,6 +147,18 @@ SCENARIOS = [
                   {"do": "wait", "for": "conversation.item.retrieved"}],
     },
     {
+        # what a client does on barge-in (e.g. Pipecat): the user speaks, the heard part of the answer is truncated
+        "name": "truncate_while_speaking",
+        "phase": "P3",
+        "steps": [no_vad(output_modalities=["audio"]), WAIT_UPDATED,
+                  user_text("Tell me about Paris in two sentences."), CREATE, WAIT_DONE,
+                  {"do": "audio", "file": "q_population.wav"},
+                  {"do": "send", "event": {"type": "conversation.item.truncate", "item_id": "$item[1]", "content_index": 0,
+                                           "audio_end_ms": 800}},
+                  {"do": "wait", "for": "conversation.item.truncated"},
+                  COMMIT, CREATE, WAIT_DONE],
+    },
+    {
         "name": "instructions_change",
         "phase": "P3",
         "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
