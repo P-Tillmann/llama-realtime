@@ -411,11 +411,25 @@ struct realtime_conversation {
     std::string tool_footer;
     bool        has_tool_text = false; // the chat template renders tool results
 
+    // around a system message in the conversation, by what goes before it; next: before what follows it
+    struct system_text {
+        std::string after_assistant; // after a response (or another system message), next_header goes first
+        std::string in_user;         // closes the open user turn
+        std::string after_tool;      // after tool results
+        std::string first;           // at the start, with the session instructions and tools
+        std::string footer;
+        std::string next;            // before the next user turn or the generation prompt
+        bool        ok       = false;
+        bool        ok_first = false;
+        bool        ok_tool  = false;
+    } sys_text;
+
     // conversation state, owned by the reader thread
     bool        started   = false; // something went into the slot, the session type is fixed
     bool        turn_open = false; // a user turn is being filled
     bool        has_audio = false; // the open turn has audio not committed yet
     bool        tool_results = false; // tool results went in after the last response, the next one answers them
+    bool        system_last  = false; // a system message went in last, a user turn or a response follows it
     int         n_turns   = 0;
     std::string next_header;       // text that goes in before the next user turn
 
@@ -423,13 +437,14 @@ struct realtime_conversation {
     struct turn_state {
         bool        turn_open    = false;
         bool        tool_results = false;
+        bool        system_last  = false;
         int         n_turns      = 0;
         std::string next_header;
     };
 
     // an item of the conversation and what it takes to put it in again
     struct conv_item {
-        enum kind_t { USER_TEXT, USER_AUDIO, TOOL_OUTPUT, ASSISTANT } kind;
+        enum kind_t { USER_TEXT, USER_AUDIO, TOOL_OUTPUT, ASSISTANT, SYSTEM } kind;
         std::string          id;
         std::string          mark;        // slot mark at its start; empty: it follows the previous item of its response
         turn_state           before;
@@ -700,6 +715,10 @@ struct realtime_conversation {
         return assistant_header + content;
     }
 
+    static bool ends_with(const std::string & s, const std::string & suffix) {
+        return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+    }
+
     // the text around a user and an assistant turn, from placeholder messages
     bool derive_turn_text() {
         const std::string user  = "@@USER@@";
@@ -738,6 +757,51 @@ struct realtime_conversation {
         assistant_footer = c.substr(pc + reply.size());
         user_header      = d.substr(c.size(), pd - c.size());
 
+        // a system message in the conversation: its text after a response, inside an open user turn and at the start;
+        // what follows it must be the user header or the generation prompt after a common part (sys_text.next)
+        sys_text = {};
+        const std::string sys_msg = "@@SYSTEM@@";
+        const std::string user2   = "@@USER2@@";
+        const auto        npos    = std::string::npos;
+        try {
+            const std::string f1 = with({msg("user", user), msg("assistant", reply), msg("system", sys_msg)});
+            const std::string g1 = with({msg("user", user), msg("assistant", reply), msg("system", sys_msg)}, true);
+            const std::string f2 = with({msg("user", user), msg("assistant", reply), msg("user", user2), msg("system", sys_msg)});
+            const std::string f3 = with({msg("user", user), msg("assistant", reply), msg("system", sys_msg), msg("user", user2)});
+            const size_t      p1 = f1.find(sys_msg, c.size());
+            const size_t      q2 = f2.find(user2, c.size());
+            const size_t      p2 = q2 == npos ? npos : f2.find(sys_msg, q2 + user2.size());
+            const size_t      p3 = f3.find(user2, f1.size());
+            if (p1 != npos && p2 != npos && p3 != npos && f1.compare(0, c.size(), c) == 0 && f2.compare(0, c.size(), c) == 0 &&
+                f2.compare(c.size(), q2 - c.size(), user_header) == 0 && f3.compare(0, f1.size(), f1) == 0 &&
+                g1.compare(0, f1.size(), f1) == 0) {
+                const std::string footer = f1.substr(p1 + sys_msg.size());
+                const std::string uh     = f3.substr(f1.size(), p3 - f1.size());
+                const std::string gp     = g1.substr(f1.size());
+                if (f2.substr(p2 + sys_msg.size()) == footer && ends_with(uh, user_header) && ends_with(gp, assistant_header) &&
+                    uh.substr(0, uh.size() - user_header.size()) == gp.substr(0, gp.size() - assistant_header.size())) {
+                    sys_text.after_assistant = f1.substr(c.size(), p1 - c.size());
+                    sys_text.in_user         = f2.substr(q2 + user2.size(), p2 - q2 - user2.size());
+                    sys_text.footer          = footer;
+                    sys_text.next            = uh.substr(0, uh.size() - user_header.size());
+                    sys_text.ok              = true;
+                }
+            }
+            if (sys_text.ok) {
+                const std::string f4 = with({msg("system", sys_msg)});
+                const std::string f5 = with({msg("system", sys_msg), msg("user", user2)});
+                const size_t      p4 = f4.find(sys_msg);
+                const size_t      p5 = f5.find(user2, f4.size());
+                if (p4 != npos && p5 != npos && f4.substr(p4 + sys_msg.size()) == sys_text.footer &&
+                    f5.compare(0, f4.size(), f4) == 0 && f5.substr(f4.size(), p5 - f4.size()) == sys_text.next + user_header) {
+                    sys_text.first    = f4.substr(0, p4);
+                    sys_text.ok_first = true;
+                }
+            }
+        } catch (const std::exception &) {
+            // the template has no system messages in the conversation
+        }
+
         // a tool result follows the assistant turn that called the tool; without session tools a placeholder tool
         // stands in, the tools can come with each response (response.create) and their results with the conversation
         tool_header.clear();
@@ -761,6 +825,20 @@ struct realtime_conversation {
                 tool_footer   = f.substr(pf + result.size());
                 has_tool_text = true;
             }
+            // a system message after tool results
+            if (has_tool_text && sys_text.ok) {
+                const std::string f6 = with({msg("user", user), call, res, msg("system", sys_msg)});
+                const size_t      pr = f6.find(result, e.size());
+                if (pr != npos && f6.compare(0, e.size(), e) == 0 && f6.compare(e.size(), pr - e.size(), tool_header) == 0) {
+                    const std::string rest = f6.substr(pr + result.size());
+                    const size_t      ps   = rest.find(sys_msg);
+                    if (ps != npos && rest.compare(0, tool_footer.size(), tool_footer) == 0 && ps >= tool_footer.size() &&
+                        rest.substr(ps + sys_msg.size()) == sys_text.footer) {
+                        sys_text.after_tool = rest.substr(tool_footer.size(), ps - tool_footer.size());
+                        sys_text.ok_tool    = true;
+                    }
+                }
+            }
         } catch (const std::exception &) {
             // the template has no tool messages
         }
@@ -777,23 +855,51 @@ struct realtime_conversation {
         if (turn_open) {
             return true;
         }
-        const std::string header = n_turns == 0 ? first_header : next_header + user_header;
+        const std::string header = n_turns == 0 && !system_last ? first_header : next_header + user_header;
         if (!control(SERVER_CONTROL_ACTION_TEXT_APPEND, header)) {
             return false;
         }
         next_header.clear();
-        started   = true;
-        turn_open = true;
+        started     = true;
+        turn_open   = true;
+        system_last = false;
         return true;
     }
 
+    // the text of a system message where the conversation stands, empty with err set if the template has none there
+    std::string system_text_here(std::string & err) const {
+        if (!sys_text.ok) {
+            err = "the chat template has no system messages in the conversation";
+            return "";
+        }
+        if (turn_open) {
+            return sys_text.in_user;
+        }
+        if (tool_results) {
+            if (!sys_text.ok_tool) {
+                err = "the chat template has no system message after tool results";
+                return "";
+            }
+            return sys_text.after_tool;
+        }
+        if (n_turns == 0 && !system_last) {
+            if (!sys_text.ok_first) {
+                err = "the chat template has no system message at the start of the conversation";
+                return "";
+            }
+            return sys_text.first;
+        }
+        return next_header + sys_text.after_assistant;
+    }
+
     turn_state save_turn() const {
-        return {turn_open, tool_results, n_turns, next_header};
+        return {turn_open, tool_results, system_last, n_turns, next_header};
     }
 
     void load_turn(const turn_state & t) {
         turn_open    = t.turn_open;
         tool_results = t.tool_results;
+        system_last  = t.system_last;
         n_turns      = t.n_turns;
         next_header  = t.next_header;
     }
@@ -852,7 +958,22 @@ struct realtime_conversation {
                 }
                 next_header.clear();
                 tool_results = true;
+                system_last  = false;
                 return true;
+            case conv_item::SYSTEM:
+                {
+                    std::string err;
+                    const std::string head = system_text_here(err);
+                    if (!err.empty() || !control(SERVER_CONTROL_ACTION_TEXT_APPEND, head + it.text + sys_text.footer)) {
+                        return false;
+                    }
+                    next_header  = sys_text.next;
+                    started      = true;
+                    turn_open    = false;
+                    tool_results = false;
+                    system_last  = true;
+                    return true;
+                }
             case conv_item::ASSISTANT:
                 break;
         }
@@ -889,6 +1010,7 @@ struct realtime_conversation {
         }
         turn_open    = false;
         tool_results = false;
+        system_last  = false;
         n_turns++;
         return true;
     }
@@ -1627,15 +1749,15 @@ struct realtime_conversation {
                        {"call_id", json_value(item, "call_id", std::string())}, {"arguments", json_value(item, "arguments", std::string())}};
             return true;
         }
-        if (type != "message" || (role != "user" && role != "assistant")) {
-            err = "only user and assistant messages, function calls and function call outputs are supported";
+        if (type != "message" || (role != "user" && role != "assistant" && role != "system")) {
+            err = "only user, assistant and system messages, function calls and function call outputs are supported";
             return false;
         }
         json content = json::array();
         std::string text;
         for (const auto & p : item.value("content", json::array())) {
             const std::string t = json_value(p, "type", std::string());
-            if (role == "user" && t == "input_text") {
+            if ((role == "user" || role == "system") && t == "input_text") {
                 text += json_value(p, "text", std::string());
                 content.push_back({{"type", t}, {"text", json_value(p, "text", std::string())}});
             } else if (role == "user" && t == "input_audio") {
@@ -1667,7 +1789,8 @@ struct realtime_conversation {
             err = "a user message has either text or audio";
             return false;
         }
-        it.kind = role == "assistant" ? conv_item::ASSISTANT : it.pcm.empty() ? conv_item::USER_TEXT : conv_item::USER_AUDIO;
+        it.kind = role == "assistant" ? conv_item::ASSISTANT : role == "system" ? conv_item::SYSTEM :
+                  it.pcm.empty() ? conv_item::USER_TEXT : conv_item::USER_AUDIO;
         it.text = text;
         if (it.kind == conv_item::ASSISTANT) {
             it.response_id = "client_" + it.id;
@@ -1712,6 +1835,13 @@ struct realtime_conversation {
                 send_event({{"type", "conversation.item.done"},  {"previous_item_id", prev}, {"item", out}});
             }
             return;
+        }
+        if (it.kind == conv_item::SYSTEM) {
+            system_text_here(err);
+            if (!err.empty()) {
+                send_error("conversation.item.create: " + err);
+                return;
+            }
         }
         if (it.kind == conv_item::TOOL_OUTPUT) {
             on_tool_output(std::move(it));
@@ -1827,7 +1957,7 @@ struct realtime_conversation {
             return false;
         }
         // a response needs a user turn or tool results before it
-        return turn_open || tool_results || ensure_turn();
+        return turn_open || tool_results || system_last || ensure_turn();
     }
 
     // the own context of a response over the conversation (no input of its own): the session context goes into a
@@ -1872,7 +2002,7 @@ struct realtime_conversation {
             return false;
         }
         // a response needs a user turn or tool results before it
-        return turn_open || tool_results || ensure_turn();
+        return turn_open || tool_results || system_last || ensure_turn();
     }
 
     void on_response_create(const json & ev) {
@@ -1906,7 +2036,7 @@ struct realtime_conversation {
         const bool has_input = resp.contains("input") && resp["input"].is_array();
         const bool fresh     = has_input || resp_instructions != instructions || resp_tools_json != tools_json;
 
-        if (!fresh && n_turns == 0 && !turn_open && !tool_results) {
+        if (!fresh && n_turns == 0 && !turn_open && !tool_results && !system_last) {
             send_error("response.create: commit audio or create a message first", "conversation_empty");
             return;
         }
@@ -2057,6 +2187,7 @@ struct realtime_conversation {
         next_header  = assistant_footer;
         turn_open    = false;
         tool_results = false;
+        system_last  = false;
         n_turns++;
     }
 
