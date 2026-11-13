@@ -198,6 +198,44 @@ SCENARIOS = [
                   user_text("Say goodbye to me."), CREATE, WAIT_DONE],
     },
     {
+        # tools only in response.create, none in the session: the tool output still goes into the conversation
+        "name": "response_tools",
+        "phase": "P4",
+        "steps": [no_vad(output_modalities=["text"], tools=[]), WAIT_UPDATED,
+                  user_text("What's the weather in Berlin right now?"),
+                  {"do": "send", "event": {"type": "response.create", "response": {
+                      "output_modalities": ["text"], "tools": [WEATHER_TOOL], "tool_choice": "required",
+                      "instructions": "Call the matching tool.", "metadata": {"turn": "1"}}}},
+                  WAIT_DONE,
+                  {"do": "tool_output", "output": "{\"temperature_c\": 12, \"condition\": \"light rain\"}"},
+                  {"do": "wait", "for": "conversation.item.done"},
+                  {"do": "send", "event": {"type": "response.create", "response": {
+                      "output_modalities": ["text"], "tools": [],
+                      "instructions": "Tell the user the weather in one short sentence."}}},
+                  WAIT_DONE],
+    },
+    {
+        # server VAD interrupts a spoken response that has its own instructions; the client truncates what was heard
+        "name": "barge_in_response_instructions",
+        "phase": "P4",
+        "steps": [session(output_modalities=["audio"], audio={"input": {
+                      "format": {"type": "audio/pcm", "rate": 24000},
+                      "turn_detection": {"type": "server_vad", "silence_duration_ms": 500,
+                                         "create_response": False, "interrupt_response": True}}}),
+                  WAIT_UPDATED,
+                  user_text("Tell me about Paris."),
+                  {"do": "send", "event": {"type": "response.create", "response": {
+                      "output_modalities": ["audio"], "tools": [],
+                      "instructions": "Answer in at least eight long sentences."}}},
+                  {"do": "wait", "for": "response.output_audio.delta"},
+                  {"do": "audio", "file": "q_population.wav", "silence_before_ms": 300, "silence_after_ms": 1200, "realtime": True},
+                  {"do": "wait", "for": "input_audio_buffer.speech_started"},
+                  {"do": "wait", "for": "response.done"},
+                  {"do": "send", "event": {"type": "conversation.item.truncate", "item_id": "$item[1]", "content_index": 0,
+                                           "audio_end_ms": 500}},
+                  {"do": "wait", "for": "conversation.item.truncated"}],
+    },
+    {
         "name": "input_transcription",
         "phase": "P4",
         "steps": [session(output_modalities=["text"], audio={"input": {"turn_detection": None,
