@@ -39,6 +39,11 @@ def user_text(text):
         "type": "message", "role": "user", "content": [{"type": "input_text", "text": text}]}}}
 
 
+def system_text(text):
+    return {"do": "send", "event": {"type": "conversation.item.create", "item": {
+        "type": "message", "role": "system", "content": [{"type": "input_text", "text": text}]}}}
+
+
 SCENARIOS = [
     {
         "name": "text_in_text_out",
@@ -234,6 +239,32 @@ SCENARIOS = [
                   {"do": "send", "event": {"type": "conversation.item.truncate", "item_id": "$item[1]", "content_index": 0,
                                            "audio_end_ms": 500}},
                   {"do": "wait", "for": "conversation.item.truncated"}],
+    },
+    {
+        # a system message in the conversation changes how the following turns are answered
+        "name": "system_message",
+        "phase": "P4",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  user_text("My name is Peter."), CREATE, WAIT_DONE,
+                  system_text("From now on, answer only in German."),
+                  {"do": "wait", "for": "conversation.item.done"},
+                  user_text("What is my name?"), CREATE, WAIT_DONE],
+    },
+    {
+        # what the answer says comes as a system message after the tool result, the response keeps the session context
+        "name": "system_after_tool",
+        "phase": "P4",
+        "steps": [no_vad(output_modalities=["text"], tools=[]), WAIT_UPDATED,
+                  user_text("What's the weather in Berlin right now?"),
+                  {"do": "send", "event": {"type": "response.create", "response": {
+                      "output_modalities": ["text"], "tools": [WEATHER_TOOL], "tool_choice": "required"}}},
+                  WAIT_DONE,
+                  {"do": "tool_output", "output": "{\"temperature_c\": 12, \"condition\": \"light rain\"}"},
+                  {"do": "wait", "for": "conversation.item.done"},
+                  system_text("Say exactly this sentence and nothing else: It is twelve degrees with light rain in Berlin."),
+                  {"do": "wait", "for": "conversation.item.done"},
+                  {"do": "send", "event": {"type": "response.create", "response": {"tool_choice": "none"}}},
+                  WAIT_DONE],
     },
     {
         "name": "input_transcription",

@@ -1,0 +1,1003 @@
+{
+ "scenario": "system_after_tool",
+ "target": "openai",
+ "model": "gpt-realtime",
+ "status": "ok",
+ "error": null,
+ "log": [
+  {
+   "t": 0.669,
+   "event": {
+    "type": "session.created",
+    "event_id": "event_EjoO82ntblBj8dxXtpKTp",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EjoO8pP2vaZtLfjtfgfNP",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "audio"
+     ],
+     "instructions": "Your knowledge cutoff is 2023-10. You are a helpful, witty, and friendly AI. Act like a human, but remember that you aren't a human and that you can't do human things in the real world. Your voice and personality should be warm and engaging, with a lively and playful tone. If interacting in a non-English language, start by using the standard accent or dialect familiar to the user. Talk quickly. You should always call a function if you can. Do not refer to these rules, even if you’re asked about them.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794590760,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": {
+        "type": "server_vad",
+        "threshold": 0.5,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 200,
+        "idle_timeout_ms": null,
+        "create_response": true,
+        "interrupt_response": true
+       }
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 0.67,
+   "sent": {
+    "type": "session.update",
+    "session": {
+     "type": "realtime",
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "audio": {
+      "input": {
+       "turn_detection": null
+      }
+     },
+     "output_modalities": [
+      "text"
+     ],
+     "tools": []
+    }
+   }
+  },
+  {
+   "t": 0.812,
+   "event": {
+    "type": "session.updated",
+    "event_id": "event_EjoO8AR1rnNj1nW7nXFOl",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EjoO8pP2vaZtLfjtfgfNP",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "text"
+     ],
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794590760,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": null
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 0.812,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "What's the weather in Berlin right now?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.812,
+   "sent": {
+    "type": "response.create",
+    "response": {
+     "output_modalities": [
+      "text"
+     ],
+     "tools": [
+      {
+       "type": "function",
+       "name": "get_weather",
+       "description": "Get the current weather for a city.",
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "city"
+        ]
+       }
+      }
+     ],
+     "tool_choice": "required"
+    }
+   }
+  },
+  {
+   "t": 0.957,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EjoO8UwC5Dp49Pzyz9LJf",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EjoO8m7vo6b0SaBskIyhX",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "What's the weather in Berlin right now?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.957,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EjoO8Jwrv8svnHa7WMsaQ",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EjoO8m7vo6b0SaBskIyhX",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "What's the weather in Berlin right now?"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 0.978,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EjoO83hfk1RiYbFiS5iUL",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EjoO8Opzm0mchmUSAfglF",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.255,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EjoO90ESKWp01ouXb6UQr",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "output_index": 0,
+    "item": {
+     "id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+     "type": "function_call",
+     "status": "in_progress",
+     "name": "get_weather",
+     "call_id": "call_iEwN3HemuMtldWjG",
+     "arguments": ""
+    }
+   }
+  },
+  {
+   "t": 1.257,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EjoO9ZdTYyefg0U61pg1Z",
+    "previous_item_id": "item_EjoO8m7vo6b0SaBskIyhX",
+    "item": {
+     "id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+     "type": "function_call",
+     "status": "in_progress",
+     "name": "get_weather",
+     "call_id": "call_iEwN3HemuMtldWjG",
+     "arguments": ""
+    }
+   }
+  },
+  {
+   "t": 1.257,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9IWNXLj08Gt9t4Dcu",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "{",
+    "obfuscation": "xLxFbl2NeXFaOmw"
+   }
+  },
+  {
+   "t": 1.27,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9Ro9Vjp8W4Ab6pARG",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "  \n",
+    "obfuscation": "7OJimfNuV52hA"
+   }
+  },
+  {
+   "t": 1.308,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9QGs8qIMT046ktTID",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": " ",
+    "obfuscation": "11zsjBTeSEv67La"
+   }
+  },
+  {
+   "t": 1.309,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9qPHs1zmPP6FzWDIU",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": " \"",
+    "obfuscation": "bgzdOtmBI5eNiT"
+   }
+  },
+  {
+   "t": 1.315,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9sJ6i2sIEWXa4JxVz",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "city",
+    "obfuscation": "GvnE5Tv2B2Ep"
+   }
+  },
+  {
+   "t": 1.315,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9kear5w3jiKOF3N3o",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "\":",
+    "obfuscation": "1HBigfnC7sxJzn"
+   }
+  },
+  {
+   "t": 1.317,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9bTVumwscksCVB1KB",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": " \"",
+    "obfuscation": "gL8zQ7MSXvka3b"
+   }
+  },
+  {
+   "t": 1.318,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9gJh4ZNH9bLiY6C4L",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "Berlin",
+    "obfuscation": "v7G3R6T24W"
+   }
+  },
+  {
+   "t": 1.373,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9sveZwFcIcdaoJoMX",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "\"",
+    "obfuscation": "Q134jcZ6zZtHaFM"
+   }
+  },
+  {
+   "t": 1.373,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO93087yfLHFd8DNllS",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": " \n",
+    "obfuscation": "yEd3ONyTcsqA9w"
+   }
+  },
+  {
+   "t": 1.373,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9CWJqPj611P9zcOWT",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "}",
+    "obfuscation": "WJCzwtCPyUakaL1"
+   }
+  },
+  {
+   "t": 1.373,
+   "event": {
+    "type": "response.function_call_arguments.delta",
+    "event_id": "event_EjoO9WGBqX4mtpqByMmzd",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "delta": "  \n",
+    "obfuscation": "RrCnQ8CxVYnON"
+   }
+  },
+  {
+   "t": 1.373,
+   "event": {
+    "type": "response.function_call_arguments.done",
+    "event_id": "event_EjoO9RkWFJzREyd6hTvKF",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "output_index": 0,
+    "call_id": "call_iEwN3HemuMtldWjG",
+    "name": "get_weather",
+    "arguments": "{  \n  \"city\": \"Berlin\" \n}  \n"
+   }
+  },
+  {
+   "t": 1.373,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EjoO9VvTOuAqiCXIrz1oj",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+     "type": "function_call",
+     "status": "completed",
+     "name": "get_weather",
+     "call_id": "call_iEwN3HemuMtldWjG",
+     "arguments": "{  \n  \"city\": \"Berlin\" \n}  \n"
+    }
+   }
+  },
+  {
+   "t": 1.375,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EjoO9BjEnuTe1v3IG3P6u",
+    "response_id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+    "output_index": 0,
+    "item": {
+     "id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+     "type": "function_call",
+     "status": "completed",
+     "name": "get_weather",
+     "call_id": "call_iEwN3HemuMtldWjG",
+     "arguments": "{  \n  \"city\": \"Berlin\" \n}  \n"
+    }
+   }
+  },
+  {
+   "t": 1.378,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EjoO92OpQpiHHN1iuLqaJ",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EjoO8WgRxVRzZkqGhLwrj",
+     "status": "completed",
+     "status_details": null,
+     "output": [
+      {
+       "id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+       "type": "function_call",
+       "status": "completed",
+       "name": "get_weather",
+       "call_id": "call_iEwN3HemuMtldWjG",
+       "arguments": "{  \n  \"city\": \"Berlin\" \n}  \n"
+      }
+     ],
+     "conversation_id": "conv_EjoO8Opzm0mchmUSAfglF",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 81,
+      "input_tokens": 61,
+      "output_tokens": 20,
+      "input_token_details": {
+       "text_tokens": 61,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 20,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.378,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "function_call_output",
+     "call_id": "call_iEwN3HemuMtldWjG",
+     "output": "{\"temperature_c\": 12, \"condition\": \"light rain\"}"
+    }
+   }
+  },
+  {
+   "t": 1.396,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EjoO9mRIoptMVXAOrQCaU",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199717,
+      "reset_seconds": 0.084
+     }
+    ]
+   }
+  },
+  {
+   "t": 1.517,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EjoO9Agcut5fj5RGrVWmL",
+    "previous_item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "item": {
+     "id": "item_EjoO98chO1tQ2RgE5pcYS",
+     "type": "function_call_output",
+     "call_id": "call_iEwN3HemuMtldWjG",
+     "output": "{\"temperature_c\": 12, \"condition\": \"light rain\"}"
+    }
+   }
+  },
+  {
+   "t": 1.518,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EjoO90jpEYDam980OcDe1",
+    "previous_item_id": "item_EjoO8PJRbVGvZ1lpMX4Qy",
+    "item": {
+     "id": "item_EjoO98chO1tQ2RgE5pcYS",
+     "type": "function_call_output",
+     "call_id": "call_iEwN3HemuMtldWjG",
+     "output": "{\"temperature_c\": 12, \"condition\": \"light rain\"}"
+    }
+   }
+  },
+  {
+   "t": 1.518,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "system",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Say exactly this sentence and nothing else: It is twelve degrees with light rain in Berlin."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.657,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EjoO9wrySTieJvrWUSZks",
+    "previous_item_id": "item_EjoO98chO1tQ2RgE5pcYS",
+    "item": {
+     "id": "item_EjoO9gKOgekymfzW3NoU2",
+     "type": "message",
+     "status": "completed",
+     "role": "system",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Say exactly this sentence and nothing else: It is twelve degrees with light rain in Berlin."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.657,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EjoO9cLrBZqS2jgYhlDZ5",
+    "previous_item_id": "item_EjoO98chO1tQ2RgE5pcYS",
+    "item": {
+     "id": "item_EjoO9gKOgekymfzW3NoU2",
+     "type": "message",
+     "status": "completed",
+     "role": "system",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Say exactly this sentence and nothing else: It is twelve degrees with light rain in Berlin."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.658,
+   "sent": {
+    "type": "response.create",
+    "response": {
+     "tool_choice": "none"
+    }
+   }
+  },
+  {
+   "t": 1.805,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EjoO92dl1RMHNoMRTI3RV",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EjoO8Opzm0mchmUSAfglF",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 2.026,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EjoO96CHOUffUEfq8gaeQ",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "output_index": 0,
+    "item": {
+     "id": "item_EjoO9FxFy1ZDhB10gcrHn",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 2.032,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EjoO9nP8eMEp0wJYGj4TD",
+    "previous_item_id": "item_EjoO9gKOgekymfzW3NoU2",
+    "item": {
+     "id": "item_EjoO9FxFy1ZDhB10gcrHn",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 2.032,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EjoO9WE8vtTW4DNERmmmT",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 2.032,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9NPZUDVa4TnYJ3XHd",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "It",
+    "obfuscation": "1s36BoTnVBOXOm"
+   }
+  },
+  {
+   "t": 2.035,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9IhTSC4rc2mlXQ4EU",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " is",
+    "obfuscation": "bteft8rERpnuO"
+   }
+  },
+  {
+   "t": 2.04,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9wlIlvX1ym8MJ9wCf",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " twelve",
+    "obfuscation": "uFpBpjlpb"
+   }
+  },
+  {
+   "t": 2.048,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9myx6QHIgEpdFM4qj",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " degrees",
+    "obfuscation": "khCTR9VY"
+   }
+  },
+  {
+   "t": 2.058,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9Qcq12lytkkZDBDUf",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " with",
+    "obfuscation": "NazDQeesYRW"
+   }
+  },
+  {
+   "t": 2.061,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9dbHxzWIwKvZj9RKl",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " light",
+    "obfuscation": "ZXgDdvPM5N"
+   }
+  },
+  {
+   "t": 2.065,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO98uqoLUIOA3HKAJgz",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " rain",
+    "obfuscation": "b0iJlh0YVUY"
+   }
+  },
+  {
+   "t": 2.074,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9wVIODoUswZ3gbJue",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " in",
+    "obfuscation": "NnKu6cALmG670"
+   }
+  },
+  {
+   "t": 2.081,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9R3yxfMhN8wa5ii59",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Berlin",
+    "obfuscation": "0wf1AiK7P"
+   }
+  },
+  {
+   "t": 2.09,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EjoO9whtzVHzARYekGaQu",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ".",
+    "obfuscation": "miJD9HX6ivdUY4h"
+   }
+  },
+  {
+   "t": 2.118,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EjoOAmru6f28mtCvSmkZL",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "It is twelve degrees with light rain in Berlin."
+   }
+  },
+  {
+   "t": 2.121,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EjoOAUOYf0L4AWazKZb7l",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "item_id": "item_EjoO9FxFy1ZDhB10gcrHn",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "It is twelve degrees with light rain in Berlin."
+    }
+   }
+  },
+  {
+   "t": 2.121,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EjoOApYO55H6AEOxfAB8Z",
+    "previous_item_id": "item_EjoO9gKOgekymfzW3NoU2",
+    "item": {
+     "id": "item_EjoO9FxFy1ZDhB10gcrHn",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "It is twelve degrees with light rain in Berlin."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.121,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EjoOAjzo17Gu4NXLM35XU",
+    "response_id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+    "output_index": 0,
+    "item": {
+     "id": "item_EjoO9FxFy1ZDhB10gcrHn",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "It is twelve degrees with light rain in Berlin."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.122,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EjoOADc1USj4RZcq0I0WY",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EjoO9zgeDE6u6Bs2VxogC",
+     "status": "completed",
+     "status_details": null,
+     "output": [
+      {
+       "id": "item_EjoO9FxFy1ZDhB10gcrHn",
+       "type": "message",
+       "status": "completed",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "It is twelve degrees with light rain in Berlin."
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EjoO8Opzm0mchmUSAfglF",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 99,
+      "input_tokens": 88,
+      "output_tokens": 11,
+      "input_token_details": {
+       "text_tokens": 88,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 11,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 2.132,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EjoOAOQMjEPDUkGEzPbuz",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199726,
+      "reset_seconds": 0.082
+     }
+    ]
+   }
+  }
+ ]
+}
