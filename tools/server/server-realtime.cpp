@@ -390,6 +390,7 @@ struct realtime_conversation {
     std::string                           speech_item_id;  // the user item of the speech in progress
     std::atomic<bool>                     responding{false};
     std::atomic<bool>                     cancel_sent{false};   // the response in progress was cancelled, it ends soon
+    std::atomic<bool>                     cancel_by_turn{false}; // by the start of speech (turn detection)
     std::atomic<bool>                     response_ended{false}; // for the idle timeout of the detector
 
     pcm_resampler in_rs;  // client rate -> model rate, owned by the reader thread
@@ -408,6 +409,7 @@ struct realtime_conversation {
     std::string assistant_footer;
     std::string tool_header;  // around a tool result
     std::string tool_footer;
+    bool        has_tool_text = false; // the chat template renders tool results
 
     // conversation state, owned by the reader thread
     bool        started   = false; // something went into the slot, the session type is fixed
@@ -463,7 +465,11 @@ struct realtime_conversation {
     std::string                      saved_instructions;
     std::vector<common_chat_tool>    saved_tools;
     json                             saved_tools_json;
-    std::deque<std::string>          held_events;
+    struct held_event {
+        std::string                     msg;     // a client event
+        std::vector<server_turn_action> actions; // or the turn detection of audio that came in meanwhile
+    };
+    std::deque<held_event>           held_events;
 
     // the item or response the results belong to, shared with the result loop
     std::mutex  mutex;
@@ -713,8 +719,16 @@ struct realtime_conversation {
         assistant_footer = c.substr(pc + reply.size());
         user_header      = d.substr(c.size(), pd - c.size());
 
-        // a tool result follows the assistant turn that called the tool
-        if (!tools.empty()) {
+        // a tool result follows the assistant turn that called the tool; without session tools a placeholder tool
+        // stands in, the tools can come with each response (response.create) and their results with the conversation
+        tool_header.clear();
+        tool_footer.clear();
+        has_tool_text = false;
+        const std::vector<common_chat_tool> session_tools = tools;
+        if (tools.empty()) {
+            tools.push_back({"tool", "", "{\"type\":\"object\",\"properties\":{}}"});
+        }
+        try {
             const std::string result = "@@RESULT@@";
             common_chat_msg call = msg("assistant", "");
             call.tool_calls.push_back({tools[0].name, "{}", "call_0"});
@@ -723,13 +737,16 @@ struct realtime_conversation {
             const std::string e  = with({msg("user", user), call});
             const std::string f  = with({msg("user", user), call, res});
             const size_t      pf = f.find(result, e.size());
-            if (pf == std::string::npos || f.compare(0, e.size(), e) != 0) {
-                return false;
+            if (pf != std::string::npos && f.compare(0, e.size(), e) == 0) {
+                tool_header   = f.substr(e.size(), pf - e.size());
+                tool_footer   = f.substr(pf + result.size());
+                has_tool_text = true;
             }
-            tool_header = f.substr(e.size(), pf - e.size());
-            tool_footer = f.substr(pf + result.size());
+        } catch (const std::exception &) {
+            // the template has no tool messages
         }
-        return true;
+        tools = session_tools;
+        return has_tool_text || session_tools.empty();
     }
 
     //
@@ -932,18 +949,49 @@ struct realtime_conversation {
         if (response_ended.exchange(false)) {
             detector->response_done();
         }
-        for (auto & a : detector->push(samples.data(), samples.size())) {
+        std::vector<server_turn_action> actions = detector->push(samples.data(), samples.size());
+        if (!holding()) {
+            run_turn_actions(actions);
+            return;
+        }
+        // a response with its own context is in progress: the start of speech interrupts it now, the audio and the
+        // commit wait with the other client events until the conversation is back
+        held_event held;
+        for (auto & a : actions) {
+            if (a.kind == server_turn_action::SPEECH_STARTED && held.actions.empty()) {
+                on_speech_started(a);
+            } else {
+                held.actions.push_back(std::move(a));
+            }
+        }
+        if (!held.actions.empty()) {
+            held_events.push_back(std::move(held));
+        }
+    }
+
+    // client events wait while a response with its own context is in progress (see handle)
+    bool holding() const {
+        return pending_restore && responding;
+    }
+
+    void on_speech_started(const server_turn_action & a) {
+        speech_item_id = "item_" + random_string();
+        if (turn_params->interrupt_response && responding) {
+            cancel_voice();
+            cancel_by_turn = true;
+            cancel_sent    = true;
+            control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
+        }
+        send_event({{"type", "input_audio_buffer.speech_started"}, {"audio_start_ms", a.audio_ms},
+                    {"item_id", speech_item_id}});
+    }
+
+    void run_turn_actions(std::vector<server_turn_action> & actions) {
+        for (auto & a : actions) {
             switch (a.kind) {
                 case server_turn_action::SPEECH_STARTED:
                     {
-                        speech_item_id = "item_" + random_string();
-                        if (turn_params->interrupt_response && responding) {
-                            cancel_voice();
-                            cancel_sent = true;
-                            control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
-                        }
-                        send_event({{"type", "input_audio_buffer.speech_started"}, {"audio_start_ms", a.audio_ms},
-                                    {"item_id", speech_item_id}});
+                        on_speech_started(a);
                     } break;
                 case server_turn_action::AUDIO:
                     {
@@ -1552,7 +1600,7 @@ struct realtime_conversation {
 
     // the result of a tool call of the last response, the next response answers it
     void on_tool_output(conv_item it) {
-        if (tools.empty() || n_turns == 0 || turn_open) {
+        if (!has_tool_text || n_turns == 0 || turn_open) {
             send_error("conversation.item.create: a function call output must follow the response that called it");
             return;
         }
@@ -1800,8 +1848,9 @@ struct realtime_conversation {
             resp_mark   = pending_mark;
             resp_before = pending_before;
         }
-        responding  = true;
-        cancel_sent = false;
+        responding     = true;
+        cancel_sent    = false;
+        cancel_by_turn = false;
         if (!control(SERVER_CONTROL_ACTION_RESPONSE_CREATE, prompt, {}, response)) {
             responding = false;
             return;
@@ -1988,16 +2037,26 @@ struct realtime_conversation {
         }
         const std::string t = json_value(ev, "type", std::string());
         if (pending_restore) {
+            if (responding && t == "input_audio_buffer.append" && detector) {
+                on_append(ev); // the turn detection runs now, so that speech interrupts the response (on_turn_audio)
+                return;
+            }
             if (responding && t != "response.cancel") {
-                held_events.push_back(msg); // runs on the conversation once it is back
+                held_events.push_back({msg, {}}); // runs on the conversation once it is back
                 return;
             }
             if (!responding) {
                 restore_conversation();
-                std::deque<std::string> held;
+                std::deque<held_event> held;
                 held.swap(held_events);
-                for (const auto & m : held) {
-                    handle(m);
+                for (auto & h : held) {
+                    if (!h.msg.empty()) {
+                        handle(h.msg);
+                    } else if (holding()) {
+                        held_events.push_back(std::move(h)); // a replayed event started another such response
+                    } else {
+                        run_turn_actions(h.actions);
+                    }
                 }
             }
         }
@@ -2021,7 +2080,8 @@ struct realtime_conversation {
             on_response_create(ev);
         } else if (t == "response.cancel") {
             cancel_voice();
-            cancel_sent = true;
+            cancel_by_turn = false;
+            cancel_sent    = true;
             control(SERVER_CONTROL_ACTION_RESPONSE_CANCEL);
         } else {
             send_error("unknown event type: " + t);
@@ -2303,7 +2363,7 @@ struct realtime_conversation {
         json        details      = nullptr;
         if (res.cancelled) {
             status  = "cancelled";
-            details = {{"type", "cancelled"}, {"reason", "client_cancelled"}};
+            details = {{"type", "cancelled"}, {"reason", cancel_by_turn ? "turn_detected" : "client_cancelled"}};
         } else if (res.truncated) {
             status  = "incomplete";
             details = {{"type", "incomplete"}, {"reason", "max_output_tokens"}};
