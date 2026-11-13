@@ -275,4 +275,74 @@ SCENARIOS = [
                   {"do": "wait", "for": "conversation.item.input_audio_transcription.completed"},
                   CREATE, WAIT_DONE],
     },
+    {
+        # the assistant speaks first: a response on an empty conversation
+        "name": "response_first",
+        "phase": "P5",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED, CREATE, WAIT_DONE],
+    },
+    {
+        "name": "item_insert_root",
+        "phase": "P5",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  user_text("What is my name?"), {"do": "wait", "for": "conversation.item.done"},
+                  {"do": "send", "event": {"type": "conversation.item.create", "previous_item_id": "root", "item": {
+                      "type": "message", "role": "user", "content": [{"type": "input_text", "text": "My name is Ada."}]}}},
+                  {"do": "wait", "for": "conversation.item.done"},
+                  CREATE, WAIT_DONE],
+    },
+    {
+        # an item created while the input audio buffer holds audio goes in before the audio item
+        "name": "item_during_audio",
+        "phase": "P5",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  {"do": "audio", "file": "q_capital.wav"},
+                  user_text("Answer the question you hear in one word."), {"do": "wait", "for": "conversation.item.done"},
+                  COMMIT, {"do": "wait", "for": "conversation.item.done"},
+                  CREATE, WAIT_DONE],
+    },
+    {
+        # audio.output of a response: its own format
+        "name": "response_audio_format",
+        "phase": "P5",
+        "steps": [no_vad(output_modalities=["audio"]), WAIT_UPDATED,
+                  user_text("Say hello."),
+                  {"do": "send", "event": {"type": "response.create", "response": {
+                      "output_modalities": ["audio"], "audio": {"output": {"format": {"type": "audio/pcmu"}}}}}},
+                  WAIT_DONE],
+    },
+    {
+        # one response at a time: the second response.create gets an error, the first response goes on
+        "name": "response_while_active",
+        "phase": "P5",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  user_text("Count from one to twenty, in words."), CREATE, CREATE,
+                  {"do": "wait", "for": "error"}, WAIT_DONE],
+    },
+    {
+        # the error object of invalid requests: code and the event_id of the client event
+        "name": "errors",
+        "phase": "P5",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  {"do": "send", "event": {"type": "input_audio_buffer.commit", "event_id": "evt_commit"}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "response.cancel", "event_id": "evt_cancel"}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "conversation.item.delete", "item_id": "item_unknown"}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "conversation.item.create", "previous_item_id": "item_unknown", "item": {
+                      "type": "message", "role": "user", "content": [{"type": "input_text", "text": "Hello."}]}}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "conversation.item.create", "item": {
+                      "id": "item_twice", "type": "message", "role": "user", "content": [{"type": "input_text", "text": "Hello."}]}}},
+                  {"do": "wait", "for": "conversation.item.done"},
+                  {"do": "send", "event": {"type": "conversation.item.create", "item": {
+                      "id": "item_twice", "type": "message", "role": "user", "content": [{"type": "input_text", "text": "Hello."}]}}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "conversation.item.create", "item": {
+                      "type": "function_call_output", "call_id": "call_unknown", "output": "{}"}}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "no.such.event"}},
+                  {"do": "wait", "for": "error"}],
+    },
 ]
