@@ -75,6 +75,7 @@ struct server_realtime_slot {
 
     std::string error;
     enum error_type error_type = ERROR_TYPE_SERVER;
+    int32_t error_n_tokens = 0; // ERROR_TYPE_EXCEED_CONTEXT_SIZE: the size the conversation would have
 
 private:
     llama_context *        ctx;

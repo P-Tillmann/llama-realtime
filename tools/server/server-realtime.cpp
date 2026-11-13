@@ -3106,6 +3106,7 @@ bool server_realtime_slot::response_start(const server_realtime_op & op) {
         }
         int32_t ret;
         while ((ret = gen.step_prompt(llama_n_batch(ctx))) > 0) {
+        error_n_tokens = n_past + n;
         }
         if (ret < 0) {
             return fail("failed to start the response");
@@ -3173,6 +3174,7 @@ bool server_realtime_slot::response_step() {
         n_past + 1 >= n_ctx;
     const bool done = stop || cancelled || ctx_full || (n_predict > 0 && n_decoded >= n_predict);
     truncated = done && !stop && !cancelled;
+        error_n_tokens = n_past + (int32_t) mtmd_helper_get_n_pos(chunks.ptr.get());
     if (!done) {
         sample_next();
     }
