@@ -1635,8 +1635,8 @@ Chat models with audio input hold a conversation on the same endpoint (with an `
 - `session.update`: `type`, `audio.input.format` and `audio.output.format`, `audio.output.voice` (a `--voice-model` voice, else one of the `voices` of `GET /props` for a model that speaks itself; another name gives the default voice), `audio.output.language` (for a model that speaks itself), `instructions` (the system prompt, before the first audio or message), `output_modalities`, `max_output_tokens` (an integer or `"inf"`, the default), `tools` (functions with `name`, `description` and `parameters`, before the first audio or message) and `tool_choice` (`"auto"`, the default, `"none"` or `"required"`)
 - `input_audio_buffer.append`: `audio` holds base64 PCM16 samples
 - `input_audio_buffer.commit`: ends the audio of the user turn, in a transcription session the transcript follows
-- `conversation.item.create`: a user message with `input_text` content, or a `function_call_output` with the `call_id` and `output` of a tool call of the last response
-- `response.create`: ends the user turn and generates the response, `response.output_modalities`, `response.max_output_tokens` and `response.tool_choice` override the session
+- `conversation.item.create`: a user message with `input_text` content, or a `function_call_output` with the `call_id` and `output` of a tool call of the last response; `previous_item_id` inserts it after that item, `"root"` before the first one
+- `response.create`: ends the user turn and generates the response, `response.output_modalities`, `response.max_output_tokens`, `response.tool_choice` and `response.audio.output` (`format`, `voice`) override the session. On an empty conversation the model speaks first. One response runs at a time
 - `response.cancel`: stops the response being generated
 
 LFM3-Omni is not trained to reason, run it with `--reasoning off` so that its turns open with an empty think block.
@@ -1650,7 +1650,7 @@ LFM3-Omni is not trained to reason, run it with `--reasoning off` so that its tu
 - `response.created`, `response.output_item.added`, `response.content_part.added`, then `response.output_text.delta` and `response.output_audio.delta` (base64 PCM16) as they are generated, then the `.done` events and `response.done`
 - `response.output_item.added` with a `function_call` item, `response.function_call_arguments.delta` and `.done`: a tool call of the response, its arguments are a JSON string
 - `conversation.item.input_audio_transcription.delta` and `.completed`: in a transcription session
-- `error`: `error.message` describes the problem
+- `error`: `error.message` describes the problem, `error.code` names it as the OpenAI API does (e.g. `conversation_already_has_active_response`, `response_cancel_not_active`, `input_audio_buffer_commit_empty`), `error.event_id` is the `event_id` of the client event that caused it
 
 Tools go into the system prompt with the chat template, and the tool calls are parsed as in `/v1/chat/completions`. The client runs the calls of a response, sends their results as `function_call_output` items, then asks for the next response.
 
