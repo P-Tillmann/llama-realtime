@@ -11,6 +11,7 @@
 
 #include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -112,6 +113,16 @@ private:
     };
     std::vector<mark> marks;
 
+    // the whole conversation with its marks, kept in host memory to switch between contexts without recomputing them
+    struct snapshot {
+        llama_pos            n_past     = 0;
+        int32_t              n_audio    = 0;
+        int32_t              n_prev_end = 0;
+        std::vector<mark>    marks;
+        std::vector<uint8_t> state;
+    };
+    std::map<std::string, snapshot> snapshots;
+
     mtmd::audio_stream_ptr stream;   // the audio of the open turn, for models that take audio as it arrives
     bool                   streaming = false; // false: the audio of a turn is held and encoded at its end
     std::vector<float>     turn_pcm;  // the audio of the open turn, for models that take it whole
@@ -131,4 +142,6 @@ private:
     bool response_step();
     bool set_mark(const std::string & name);
     bool rollback(const std::string & name);
+    bool save_snapshot(const std::string & name);
+    bool load_snapshot(const std::string & name);
 };

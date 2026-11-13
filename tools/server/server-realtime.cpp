@@ -471,6 +471,25 @@ struct realtime_conversation {
     };
     std::deque<held_event>           held_events;
 
+    // prompt cache of the contexts: a response with its own context starts from the snapshot of an earlier context
+    // with the same instructions and tools whose items begin the conversation, and only its newer items go in; the
+    // session context waits in a snapshot meanwhile, and only the items that came since go in when it is back
+    struct ctx_snapshot {
+        std::string              name;     // in the slot
+        std::string              key;      // instructions and tools
+        std::vector<std::string> ids;      // the items it holds, from the first one
+        turn_state               turn;     // after them
+        uint64_t                 used = 0;
+    };
+    static constexpr size_t   max_snapshots = 3;
+    std::vector<ctx_snapshot> snapshots;        // own contexts of earlier responses
+    bool                      snap_restore = false; // the session context of the response in progress is a snapshot
+    ctx_snapshot              session_snap;
+    ctx_snapshot              own_ctx;          // the own context in the slot, kept when the session context is back
+    std::string               own_end_mark;     // after the items of the own context
+    uint64_t                  n_snap_use = 0;
+    int                       n_snaps    = 0;
+
     // the item or response the results belong to, shared with the result loop
     std::mutex  mutex;
     std::string last_item_id;
@@ -1244,6 +1263,7 @@ struct realtime_conversation {
         std::vector<conv_item> tail;
         std::string            mark;
         turn_state             before = save_turn();
+        bool                   changed = false;
         {
             std::lock_guard<std::mutex> lock(mutex);
             // a response goes back as a whole, from its first item
@@ -1251,12 +1271,16 @@ struct realtime_conversation {
                 k--;
             }
             if (k < items.size()) {
+                changed = true;
                 mark   = items[k].mark;
                 before = items[k].before;
                 tail.assign(std::make_move_iterator(items.begin() + k), std::make_move_iterator(items.end()));
                 items.erase(items.begin() + k, items.end());
             }
             last_item_id = items.empty() ? "" : items.back().id;
+        }
+        if (changed) {
+            drop_snapshots(k);
         }
         if (!mark.empty()) {
             if (!control(SERVER_CONTROL_ACTION_ROLLBACK, mark)) {
@@ -1301,8 +1325,128 @@ struct realtime_conversation {
         return true;
     }
 
+    // what a context is told before the conversation: its snapshots are reused for the same instructions and tools
+    std::string context_key() const {
+        return instructions + '\x1f' + tools_json.dump();
+    }
+
+    static std::vector<std::string> ids_of(const std::vector<conv_item> & list) {
+        std::vector<std::string> ids;
+        ids.reserve(list.size());
+        for (const auto & it : list) {
+            ids.push_back(it.id);
+        }
+        return ids;
+    }
+
+    static bool starts_with(const std::vector<std::string> & ids, const std::vector<std::string> & prefix) {
+        return prefix.size() <= ids.size() && std::equal(prefix.begin(), prefix.end(), ids.begin());
+    }
+
+    // the snapshot of this context that holds the most items of the conversation
+    ctx_snapshot * find_snapshot(const std::string & key, const std::vector<std::string> & ids) {
+        ctx_snapshot * best = nullptr;
+        for (auto & s : snapshots) {
+            if (s.key == key && starts_with(ids, s.ids) && (!best || s.ids.size() > best->ids.size())) {
+                best = &s;
+            }
+        }
+        return best;
+    }
+
+    // keeps the own context in the slot (rolled back to its items) for the next response with the same context
+    void keep_own_context() {
+        if (own_ctx.key.empty() || !control(SERVER_CONTROL_ACTION_ROLLBACK, own_end_mark)) {
+            own_ctx = {};
+            return;
+        }
+        for (auto it = snapshots.begin(); it != snapshots.end(); ) {
+            if (it->key == own_ctx.key) {
+                control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, it->name);
+                it = snapshots.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        if (snapshots.size() >= max_snapshots) {
+            auto lru = std::min_element(snapshots.begin(), snapshots.end(),
+                                        [](const ctx_snapshot & a, const ctx_snapshot & b) { return a.used < b.used; });
+            control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, lru->name);
+            snapshots.erase(lru);
+        }
+        own_ctx.name = "ctx" + std::to_string(n_snaps++);
+        own_ctx.used = ++n_snap_use;
+        if (control(SERVER_CONTROL_ACTION_SNAPSHOT_SAVE, own_ctx.name)) {
+            snapshots.push_back(std::move(own_ctx));
+        }
+        own_ctx = {};
+    }
+
+    // items from k on change: the snapshots that hold them are of no use any more
+    void drop_snapshots(size_t k) {
+        for (auto it = snapshots.begin(); it != snapshots.end(); ) {
+            if (it->ids.size() > k) {
+                control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, it->name);
+                it = snapshots.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    // after a response with its own context: the session context from its snapshot, then the items that came since
+    bool restore_from_snapshot() {
+        keep_own_context();
+        const ctx_snapshot s = std::move(session_snap);
+        session_snap = {};
+        std::vector<conv_item> tail;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (!starts_with(ids_of(items), s.ids)) {
+                control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, s.name);
+                return false;
+            }
+            tail.assign(std::make_move_iterator(items.begin() + s.ids.size()), std::make_move_iterator(items.end()));
+            items.erase(items.begin() + s.ids.size(), items.end());
+            last_item_id = items.empty() ? "" : items.back().id;
+        }
+        if (!control(SERVER_CONTROL_ACTION_SNAPSHOT_LOAD, s.name)) {
+            std::lock_guard<std::mutex> lock(mutex);
+            items.insert(items.end(), std::make_move_iterator(tail.begin()), std::make_move_iterator(tail.end()));
+            return false;
+        }
+        control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, s.name);
+        load_turn(s.turn);
+        put_items(tail, true);
+        return true;
+    }
+
     // after a response with its own context: the session instructions and tools, the conversation as it is
     void restore_conversation() {
+        if (snap_restore) {
+            snap_restore    = false;
+            pending_restore = false;
+            instructions = saved_instructions;
+            tools        = saved_tools;
+            tools_json   = saved_tools_json;
+            configure();
+            if (restore_from_snapshot()) {
+                return;
+            }
+            // the conversation changed under the snapshot: all of it goes in again
+            drop_snapshots(0);
+            control(SERVER_CONTROL_ACTION_CLEAR);
+            load_turn({});
+            std::vector<conv_item> all;
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                all = std::move(items);
+                items.clear();
+                last_item_id.clear();
+            }
+            put_items(all, true);
+            return;
+        }
         pending_restore = false;
         instructions = saved_instructions;
         tools        = saved_tools;
@@ -1665,6 +1809,9 @@ struct realtime_conversation {
             send_error("the chat template does not fit the realtime turn format", "server_error");
             return false;
         }
+        if (!has_input) {
+            return put_cached_context(ctx_items, start, first_mark);
+        }
         if (!first_mark.empty() && !control(SERVER_CONTROL_ACTION_ROLLBACK, first_mark)) {
             send_error("failed to go back in the conversation", "server_error");
             return false;
@@ -1677,6 +1824,51 @@ struct realtime_conversation {
         pending_restore = true;
         load_turn(start);
         if (!put_items(ctx_items, false)) {
+            return false;
+        }
+        // a response needs a user turn or tool results before it
+        return turn_open || tool_results || ensure_turn();
+    }
+
+    // the own context of a response over the conversation (no input of its own): the session context goes into a
+    // snapshot, the own context starts from the snapshot of the same context that holds the most items, if any
+    bool put_cached_context(std::vector<conv_item> & ctx_items, const turn_state & start, const std::string & first_mark) {
+        own_ctx           = {};
+        session_snap      = {};
+        session_snap.name = "session";
+        session_snap.ids  = ids_of(ctx_items);
+        session_snap.turn = save_turn();
+        if (!control(SERVER_CONTROL_ACTION_SNAPSHOT_SAVE, session_snap.name)) {
+            return false;
+        }
+        pending_restore = true;
+        snap_restore    = true;
+
+        const std::string key = context_key();
+        size_t from = 0;
+        if (ctx_snapshot * hit = find_snapshot(key, session_snap.ids)) {
+            if (!control(SERVER_CONTROL_ACTION_SNAPSHOT_LOAD, hit->name)) {
+                return false;
+            }
+            hit->used = ++n_snap_use;
+            load_turn(hit->turn);
+            from = hit->ids.size();
+        } else {
+            if (!first_mark.empty() && !control(SERVER_CONTROL_ACTION_ROLLBACK, first_mark)) {
+                send_error("failed to go back in the conversation", "server_error");
+                return false;
+            }
+            load_turn(start);
+        }
+        std::vector<conv_item> rest(std::make_move_iterator(ctx_items.begin() + from), std::make_move_iterator(ctx_items.end()));
+        if (!put_items(rest, false)) {
+            return false;
+        }
+        own_ctx.key  = key;
+        own_ctx.ids  = session_snap.ids;
+        own_ctx.turn = save_turn();
+        own_end_mark = "own" + std::to_string(n_marks++);
+        if (!control(SERVER_CONTROL_ACTION_MARK, own_end_mark)) {
             return false;
         }
         // a response needs a user turn or tool results before it
@@ -2869,6 +3061,42 @@ bool server_realtime_slot::rollback(const std::string & name) {
     return true;
 }
 
+bool server_realtime_slot::save_snapshot(const std::string & name) {
+    snapshot s;
+    s.n_past     = n_past;
+    s.n_audio    = n_audio;
+    s.n_prev_end = n_prev_end;
+    s.marks      = marks;
+    if (n_past > 0) {
+        s.state.resize(llama_state_seq_get_size_ext(ctx, seq_id, 0));
+        if (llama_state_seq_get_data_ext(ctx, s.state.data(), s.state.size(), seq_id, 0) != s.state.size()) {
+            return fail("failed to save the conversation snapshot");
+        }
+    }
+    snapshots[name] = std::move(s);
+    return true;
+}
+
+bool server_realtime_slot::load_snapshot(const std::string & name) {
+    auto it = snapshots.find(name);
+    if (it == snapshots.end()) {
+        return fail("unknown conversation snapshot " + name);
+    }
+    const snapshot & s = it->second;
+    llama_memory_seq_rm(llama_get_memory(ctx), seq_id, -1, -1);
+    if (!s.state.empty() &&
+        llama_state_seq_set_data_ext(ctx, s.state.data(), s.state.size(), seq_id, 0) != s.state.size()) {
+        return fail("failed to load the conversation snapshot");
+    }
+    n_past     = s.n_past;
+    n_audio    = s.n_audio;
+    n_prev_end = s.n_prev_end;
+    marks      = s.marks;
+    stream.reset();
+    turn_pcm.clear();
+    return true;
+}
+
 bool server_realtime_slot::update() {
     // the hidden states drive the audio of a model that speaks itself; a text model needs no embeddings
     llama_set_embeddings(ctx, gen.valid());
@@ -2947,6 +3175,22 @@ bool server_realtime_slot::update() {
                     if (!rollback(op.text)) {
                         return false;
                     }
+                } break;
+            case SERVER_CONTROL_ACTION_SNAPSHOT_SAVE:
+                {
+                    if (!save_snapshot(op.text)) {
+                        return false;
+                    }
+                } break;
+            case SERVER_CONTROL_ACTION_SNAPSHOT_LOAD:
+                {
+                    if (!load_snapshot(op.text)) {
+                        return false;
+                    }
+                } break;
+            case SERVER_CONTROL_ACTION_SNAPSHOT_DROP:
+                {
+                    snapshots.erase(op.text);
                 } break;
             default:
                 break;

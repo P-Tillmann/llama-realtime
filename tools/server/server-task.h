@@ -65,6 +65,9 @@ enum server_control_action {
     SERVER_CONTROL_ACTION_CLEAR,           // drop the conversation
     SERVER_CONTROL_ACTION_MARK,            // remember the conversation as it is, under the name control_text
     SERVER_CONTROL_ACTION_ROLLBACK,        // go back to the mark control_text, later marks are dropped
+    SERVER_CONTROL_ACTION_SNAPSHOT_SAVE,   // keep the whole conversation in host memory under the name control_text
+    SERVER_CONTROL_ACTION_SNAPSHOT_LOAD,   // replace the conversation by the snapshot control_text (it stays)
+    SERVER_CONTROL_ACTION_SNAPSHOT_DROP,   // free the snapshot control_text
 };
 
 // a response of a realtime conversation
