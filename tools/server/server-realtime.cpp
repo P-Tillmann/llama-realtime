@@ -3014,8 +3014,9 @@ bool server_realtime_slot::audio_rows() {
         if (n <= 0) {
             return true;
         }
-        const float * rows = mtmd_audio_stream_get_output_embd(stream.get());
-        if (!decode(nullptr, rows, n, false)) {
+        const llama_token * tokens = mtmd_audio_stream_get_output_tokens(stream.get());
+        const float *       rows   = tokens ? nullptr : mtmd_audio_stream_get_output_embd(stream.get());
+        if (!decode(tokens, rows, n, false)) {
             return false;
         }
     }

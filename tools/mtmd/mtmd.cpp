@@ -4052,6 +4052,7 @@ struct mtmd_audio_stream {
     std::vector<float> embd;    // pending audio embeddings
     size_t embd_off = 0;        // rows of embd already consumed
     std::vector<float> out;     // rows of the last step
+    std::vector<llama_token> out_tok; // token ids of the rows of the last step, empty if the rows are not tokens
 
     int64_t n_rows = 0;         // rows produced so far
     int64_t n_rows_done = 0;    // audio rows whose text has been sampled, see mtmd_audio_stream_get_n_rows()
@@ -4146,6 +4147,7 @@ struct mtmd_audio_stream_lfm3a : mtmd_audio_stream {
 };
 
 // Gemma 4: the encoder is causal
+// the markers go out with their tokens: as embedding rows they skip the token scale and the per-layer embeddings
 struct mtmd_audio_stream_gemma4a : mtmd_audio_stream {
     mtmd_subctx_enc_state * enc_state = nullptr;
 
@@ -4157,6 +4159,8 @@ struct mtmd_audio_stream_gemma4a : mtmd_audio_stream {
 
     std::vector<float> beg_rows;
     std::vector<float> end_rows;
+    std::vector<llama_token> beg_tokens;
+    std::vector<llama_token> end_tokens;
     bool beg_done = false;
     bool end_done = false;
 
@@ -4248,26 +4252,44 @@ const float * mtmd_audio_stream_get_output_embd(const mtmd_audio_stream * s) {
     return s->out.data();
 }
 
+const llama_token * mtmd_audio_stream_get_output_tokens(const mtmd_audio_stream * s) {
+    return s->out_tok.empty() ? nullptr : s->out_tok.data();
+}
+
 bool mtmd_audio_stream_is_seq_start(const mtmd_audio_stream * s) {
     return s->seq_start;
 }
 
 
-// token embeddings of aud_beg / aud_end
-static bool mtmd_audio_stream_marker_rows(const mtmd_context * ctx, const std::string & text, std::vector<float> & rows) {
-    rows.clear();
+// tokens of aud_beg / aud_end
+static bool mtmd_audio_stream_marker_tokens(const mtmd_context * ctx, const std::string & text, std::vector<llama_token> & tokens) {
+    tokens.clear();
     if (text.empty()) {
         return true;
     }
     const llama_vocab * vocab = llama_model_get_vocab(ctx->text_model);
-    std::vector<llama_token> tokens(text.size() + 4);
+    tokens.resize(text.size() + 4);
     const int32_t n = llama_tokenize(vocab, text.c_str(), (int32_t) text.size(), tokens.data(), (int32_t) tokens.size(), false, true);
     if (n <= 0) {
         LOG_ERR("%s: cannot tokenize the audio marker %s\n", __func__, text.c_str());
         return false;
     }
-    rows.resize((size_t) n * ctx->n_embd_text);
-    return llama_model_get_tok_embd_rows(ctx->text_model, tokens.data(), n, rows.data()) != 0;
+    tokens.resize(n);
+    return true;
+}
+
+// token embeddings of aud_beg / aud_end
+static bool mtmd_audio_stream_marker_rows(const mtmd_context * ctx, const std::string & text, std::vector<float> & rows) {
+    rows.clear();
+    std::vector<llama_token> tokens;
+    if (!mtmd_audio_stream_marker_tokens(ctx, text, tokens)) {
+        return false;
+    }
+    if (tokens.empty()) {
+        return true;
+    }
+    rows.resize(tokens.size() * ctx->n_embd_text);
+    return llama_model_get_tok_embd_rows(ctx->text_model, tokens.data(), (int32_t) tokens.size(), rows.data()) != 0;
 }
 
 //
@@ -4786,7 +4808,8 @@ bool mtmd_audio_stream_gemma4a::init(const mtmd_audio_stream_params & params) {
         return false;
     }
 
-    return mtmd_audio_stream_marker_rows(ctx, ctx->aud_beg, beg_rows) && mtmd_audio_stream_marker_rows(ctx, ctx->aud_end, end_rows);
+    return mtmd_audio_stream_marker_tokens(ctx, ctx->aud_beg, beg_tokens) && mtmd_audio_stream_marker_tokens(ctx, ctx->aud_end, end_tokens)
+        && mtmd_audio_stream_marker_rows(ctx, ctx->aud_beg, beg_rows) && mtmd_audio_stream_marker_rows(ctx, ctx->aud_end, end_rows);
 }
 
 // mel frames of a segment with n samples
@@ -4916,26 +4939,28 @@ int32_t mtmd_audio_stream_gemma4a::step(llama_token /* last_token */) {
     }
 
     // rows carry no text, all of them go out at once and last_token is not used
+    // the markers go out in steps of their own, before the first and after the last audio rows
     const int64_t n_avail = (int64_t) (embd.size() / n_embd);
     out.clear();
-    if (n_avail > 0 || ended) {
-        if (!beg_done) {
-            beg_done = true;
-            out = beg_rows;
-        }
-        out.insert(out.end(), embd.begin(), embd.end());
+    out_tok.clear();
+    if (!beg_done && !beg_tokens.empty() && (n_avail > 0 || ended)) {
+        beg_done = true;
+        out      = beg_rows;
+        out_tok  = beg_tokens;
+    } else if (n_avail > 0) {
+        out.assign(embd.begin(), embd.end());
         embd.clear();
-        if (ended && !end_done) {
-            end_done = true;
-            out.insert(out.end(), end_rows.begin(), end_rows.end());
-        }
+        n_rows_done += n_avail; // the markers are not audio rows
+    } else if (ended && !end_done && !end_tokens.empty()) {
+        end_done = true;
+        out      = end_rows;
+        out_tok  = end_tokens;
     }
     const int64_t n_out = (int64_t) (out.size() / n_embd);
     if (n_out == 0) {
         return ended ? -1 : 0;
     }
-    n_rows      += n_out;
-    n_rows_done += n_avail; // the markers are not audio rows
+    n_rows += n_out;
     return (int32_t) n_out;
 }
 
