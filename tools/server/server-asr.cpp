@@ -419,9 +419,8 @@ class server_asr_model {
                     t.text += ' ';
                 }
             }
-            const llama_token * tokens = mtmd_audio_stream_get_output_tokens(t.stream.get());
-            const float *       rows   = tokens ? nullptr : mtmd_audio_stream_get_output_embd(t.stream.get());
-            if (!decode(t, tokens, rows, n)) {
+            const float * rows = mtmd_audio_stream_get_output_embd(t.stream.get());
+            if (!decode(t, nullptr, rows, n)) {
                 return false;
             }
             t.n_in += n;
