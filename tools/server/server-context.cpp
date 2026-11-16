@@ -3738,12 +3738,7 @@ private:
             if (!slot.is_processing() || !slot.rt) {
                 return;
             }
-            if (!slot.rt->update()) {
-                // a realtime task has no prompt tokens, the slot knows the size of its conversation
-                send_error(slot.task->id, slot.rt->error, slot.rt->error_type, slot.rt->error_n_tokens, slot.n_ctx);
-                slot.release();
-                return;
-            }
+            slot.rt->update();
             slot.audio_wait = slot.rt->is_idle();
         });
     }
@@ -6220,7 +6215,7 @@ void server_routes::init_routes() {
     // transcription of the user audio of realtime conversations: a completion with the ASR prompt on a free slot,
     // as /v1/audio/transcriptions does
     this->realtime_transcribe = [this](const std::vector<float> & pcm, int rate, const std::string & language, std::string & text,
-                                       int32_t & n_input, int32_t & n_output) {
+                                       int32_t & n_input, int32_t & n_output, const std::function<bool()> & should_stop) {
         try {
             // a 16-bit PCM WAV of the audio
             raw_buffer wav;
@@ -6259,7 +6254,7 @@ void server_routes::init_routes() {
             tasks.push_back(std::move(task));
             rd.post_tasks(std::move(tasks), session);
 
-            auto all = rd.wait_for_all([]() { return false; });
+            auto all = rd.wait_for_all(should_stop);
             auto * fin = all.results.empty() ? nullptr : dynamic_cast<server_task_result_cmpl_final *>(all.results[0].get());
             if (all.is_terminated || !fin) {
                 return false;

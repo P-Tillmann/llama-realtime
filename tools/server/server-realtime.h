@@ -40,9 +40,10 @@ struct server_realtime_deps {
     std::shared_ptr<server_voices>     voices;     // null: audio output only from a model that speaks itself
     std::shared_ptr<server_asr>        asr;        // null: audio input only to a model that hears itself
 
-    // transcribes PCM (mono, at rate) on another slot, with the token counts; false on error, null without audio input
+    // transcribes PCM (mono, at rate) on another slot, with the token counts; null without audio input
+    // false on error, or when should_stop says so while it waits for the slot or the text
     std::function<bool(const std::vector<float> & pcm, int rate, const std::string & language, std::string & text,
-                       int32_t & n_input, int32_t & n_output)> transcribe;
+                       int32_t & n_input, int32_t & n_output, const std::function<bool()> & should_stop)> transcribe;
 };
 
 // a realtime conversation over websocket, for chat models with audio input (e.g. LFM3-Audio, Gemma 4, Voxtral, Ultravox):
@@ -67,15 +68,12 @@ struct server_realtime_slot {
     void push(server_realtime_op && op);
     void cancel(); // stops the response being generated
 
-    // runs the queued controls, or one step of the response; false on error, see error and error_type
-    bool update();
+    // runs the queued controls, or one step of the response
+    // a control that fails does not end the session: the session gets a fault result and puts the conversation in again
+    void update();
 
     // nothing to run until the next control
     bool is_idle() const;
-
-    std::string error;
-    enum error_type error_type = ERROR_TYPE_SERVER;
-    int32_t error_n_tokens = 0; // ERROR_TYPE_EXCEED_CONTEXT_SIZE: the size the conversation would have
 
 private:
     llama_context *        ctx;
@@ -90,6 +88,10 @@ private:
     int                    index;
 
     std::deque<server_realtime_op> ops;
+    std::string     error;
+    enum error_type error_type = ERROR_TYPE_SERVER;
+    bool        faulted    = false; // after a failed control: only CLEAR and SNAPSHOT_DROP run
+    int32_t     n_clears   = 0;
     llama_pos   n_past     = 0;     // positions of the conversation in the sequence
     bool        responding = false;
     bool        cancelled  = false;
@@ -133,6 +135,7 @@ private:
     std::set<llama_token>  preserved; // special tokens of the response that go out as text (tool calls)
 
     bool fail(const std::string & msg, enum error_type type = ERROR_TYPE_SERVER);
+    bool run();
     void send_result(common_chat_input content, std::vector<float> audio, bool response_done = false);
     bool decode(const llama_token * tokens, const float * rows, int32_t n, bool logits_last);
     bool audio_rows();

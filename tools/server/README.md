@@ -1630,12 +1630,14 @@ Chat models with audio input hold a conversation on the same endpoint (with an `
 - `realtime` (default): a conversation, every response stays in context for the next turns
 - `transcription`: each committed audio buffer is transcribed on its own, `audio.input.transcription.language` picks the language
 
+A new session starts as an OpenAI session does: `audio.input.turn_detection` is `server_vad`, so the server commits the audio at the end of speech and answers it, and `output_modalities` is `["audio"]` (`["text"]` if the model cannot speak and there is no `--voice-model`). A client that commits the audio itself sets `turn_detection` to `null`.
+
 *Client events:*
 
-- `session.update`: `type`, `audio.input.format` and `audio.output.format`, `audio.output.voice` (a `--voice-model` voice, else one of the `voices` of `GET /props` for a model that speaks itself; another name gives the default voice), `audio.output.language` (for a model that speaks itself), `instructions` (the system prompt, before the first audio or message), `output_modalities`, `max_output_tokens` (an integer or `"inf"`, the default), `tools` (functions with `name`, `description` and `parameters`, before the first audio or message) and `tool_choice` (`"auto"`, the default, `"none"` or `"required"`)
+- `session.update`: `type`, `audio.input.format` and `audio.output.format`, `audio.output.voice` (a `--voice-model` voice, else one of the `voices` of `GET /props` for a model that speaks itself; another name gives the default voice), `audio.output.language` (for a model that speaks itself), `instructions` (the system prompt, before the first audio or message), `output_modalities`, `max_output_tokens` (an integer or `"inf"`, the default), `tools` (functions with `name`, `description` and `parameters`, before the first audio or message), `tool_choice` (`"auto"`, the default, `"none"` or `"required"`) and `truncation` (see below)
 - `input_audio_buffer.append`: `audio` holds base64 PCM16 samples
 - `input_audio_buffer.commit`: ends the audio of the user turn, in a transcription session the transcript follows
-- `conversation.item.create`: a user message with `input_text` content, or a `function_call_output` with the `call_id` and `output` of a tool call of the last response; `previous_item_id` inserts it after that item, `"root"` before the first one
+- `conversation.item.create`: a user message with `input_text` content, or a `function_call_output` with the `call_id` and `output` of a tool call; `previous_item_id` inserts it after that item, `"root"` before the first one. A `function_call_output` goes right after the response with its call, also when other items came since: `previous_item_id` of its `conversation.item.added` says where
 - `response.create`: ends the user turn and generates the response, `response.output_modalities`, `response.max_output_tokens`, `response.tool_choice` and `response.audio.output` (`format`, `voice`) override the session. On an empty conversation the model speaks first. One response runs at a time
 - `response.cancel`: stops the response being generated
 
@@ -1650,7 +1652,17 @@ LFM3-Omni is not trained to reason, run it with `--reasoning off` so that its tu
 - `response.created`, `response.output_item.added`, `response.content_part.added`, then `response.output_text.delta` and `response.output_audio.delta` (base64 PCM16) as they are generated, then the `.done` events and `response.done`
 - `response.output_item.added` with a `function_call` item, `response.function_call_arguments.delta` and `.done`: a tool call of the response, its arguments are a JSON string
 - `conversation.item.input_audio_transcription.delta` and `.completed`: in a transcription session
-- `error`: `error.message` describes the problem, `error.code` names it as the OpenAI API does (e.g. `conversation_already_has_active_response`, `response_cancel_not_active`, `input_audio_buffer_commit_empty`), `error.event_id` is the `event_id` of the client event that caused it
+- `error`: `error.message` describes the problem, `error.code` names it as the OpenAI API does (e.g. `conversation_already_has_active_response`, `response_cancel_not_active`, `input_audio_buffer_commit_empty`), `error.event_id` is the `event_id` of the client event that caused it. A field that the OpenAI API does not have gives `unknown_parameter`, with its path in `error.param` (e.g. `session.audio.input.foo`); `audio.output.language` is the one field the server adds
+
+When the conversation does not fit in the context (`--ctx-size` divided by `--parallel`), the oldest items leave the context of the model, as in the OpenAI API: no event tells it, and the client can still retrieve and delete them. `truncation` sets how:
+
+- `"auto"` (default): old turns leave until the conversation takes half of the context
+- `{"type": "retention_ratio", "retention_ratio": 0.8, "token_limits": {"post_instructions": 4000}}`: until it takes that share; `token_limits.post_instructions` (optional) truncates at that many tokens after the instructions and tools, not only when the context is full
+- `"disabled"`: nothing leaves, a response that does not fit ends with `status` `failed` and `status_details.error.code` `context_length_exceeded` until the client deletes items
+
+A response starts with a quarter of the context free (or its `max_output_tokens`, if that is less), old turns leave before it if needed. The conversation is then evaluated again from its first turn left, so a low ratio makes this rare and a high ratio keeps more of the conversation. An item or an input audio buffer that does not fit on its own leaves the context with an `error` event (`context_length_exceeded`).
+
+An error of the model while it takes the conversation or generates (e.g. a failed decode) does not end the session: the response in progress ends with `status` `failed` if the client has a part of it already, else it starts again, and the conversation is evaluated again.
 
 Tools go into the system prompt with the chat template, and the tool calls are parsed as in `/v1/chat/completions`. The client runs the calls of a response, sends their results as `function_call_output` items, then asks for the next response.
 

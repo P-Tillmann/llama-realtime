@@ -77,6 +77,7 @@ struct server_control_response {
     int32_t                        n_predict = -1; // text tokens and audio frames, -1: until the context is full
     std::string                    lang;           // empty: model default
     std::string                    voice;          // empty: model default
+    int32_t                        n_limit   = 0;  // max size of the conversation with the prompt of the response, 0: the context
 };
 
 struct task_params {
@@ -577,6 +578,13 @@ struct server_task_result_realtime : server_task_result {
     int32_t n_out_audio   = 0; // audio frames
     int32_t n_ctx         = 0;
     int32_t n_past        = 0; // the conversation after the response
+
+    // a control failed: the slot runs no more controls until a CLEAR, the session puts the conversation in again
+    bool        fault      = false;
+    bool        fault_full = false; // the conversation did not fit
+    std::string fault_message;
+    int32_t     n_clears   = 0;     // CLEAR controls run before it
+    std::vector<std::pair<std::string, int32_t>> marks; // the marks of the slot and their positions (with n_ctx and n_past)
 
     virtual bool is_stop() override {
         return false; // the session ends when the client leaves, the task is cancelled then

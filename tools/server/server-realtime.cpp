@@ -192,6 +192,50 @@ json turn_detection_json(const std::optional<server_turn_params> & p) {
             {"create_response", p->create_response}, {"interrupt_response", p->interrupt_response}};
 }
 
+// truncation: the oldest items leave the context of the model when the conversation does not fit in it
+struct truncation_params {
+    bool    on    = true;
+    double  ratio = 0.5; // share of the limit the conversation keeps then, so that it does not happen at every turn
+    int32_t limit = 0;   // token_limits.post_instructions, 0: the context
+};
+
+// "auto", "disabled" or {"type": "retention_ratio", "retention_ratio": 0.8, "token_limits": {"post_instructions": 4000}}
+bool parse_truncation(const json & j, truncation_params & out, std::string & err) {
+    truncation_params p;
+    if (j == "disabled") {
+        p.on = false;
+    } else if (j.is_object() && json_value(j, "type", std::string()) == "retention_ratio") {
+        if (!j.contains("retention_ratio") || !j["retention_ratio"].is_number()) {
+            err = "truncation: retention_ratio is missing";
+            return false;
+        }
+        p.ratio = j["retention_ratio"].get<double>();
+        if (p.ratio < 0.0 || p.ratio > 1.0) {
+            err = "truncation: retention_ratio must be between 0 and 1";
+            return false;
+        }
+        const json limits = j.value("token_limits", json::object());
+        if (limits.is_object() && limits.contains("post_instructions") && !limits["post_instructions"].is_null()) {
+            const json & n = limits["post_instructions"];
+            if (!n.is_number_integer() || n.get<int64_t>() < 1) {
+                err = "truncation: token_limits.post_instructions must be a positive integer";
+                return false;
+            }
+            p.limit = (int32_t) std::min<int64_t>(n.get<int64_t>(), INT32_MAX);
+        }
+    } else if (j != "auto") {
+        err = "truncation must be \"auto\", \"disabled\" or a retention_ratio object";
+        return false;
+    }
+    out = p;
+    return true;
+}
+
+// a field of an object, an empty object if it is not there
+json child(const json & j, const char * key) {
+    return j.is_object() && j.contains(key) ? j[key] : json::object();
+}
+
 //
 // audio formats of the client: PCM16 at any rate (24 kHz by default), G.711 u-law and A-law at 8 kHz
 //
@@ -374,7 +418,7 @@ struct realtime_conversation {
     std::string                    instructions;
     std::string                    language; // transcription
     std::string                    out_language; // of a model that speaks itself, empty: model default
-    mtmd_helper_gen_audio_out_mode out_mode          = MTMD_HELPER_GEN_AUDIO_OUT_AUTO;
+    mtmd_helper_gen_audio_out_mode out_mode          = MTMD_HELPER_GEN_AUDIO_OUT_AUDIO; // text if the model cannot speak
     int32_t                        max_output_tokens = -1; // "inf"
     audio_format                   in_fmt;                 // audio of the client
     audio_format                   out_fmt;
@@ -386,10 +430,12 @@ struct realtime_conversation {
     json        noise_reduction = nullptr;
     std::string voice           = "default";
     double      speed           = 1.0;
-    json        truncation      = "auto";
     json        tracing         = nullptr;
     json        include         = nullptr;
     json        prompt          = nullptr;
+
+    json              truncation = "auto"; // as the client sent it
+    truncation_params trunc;
 
     std::optional<server_turn_params>     turn_params;     // null: the client commits the audio
     std::unique_ptr<server_turn_detector> detector;        // owned by the reader thread
@@ -466,8 +512,23 @@ struct realtime_conversation {
         std::string          audio;          // the audio as the client sent or got it (retrieve)
         audio_format         audio_fmt;
     };
-    std::vector<conv_item> items; // guarded by mutex
+    std::vector<conv_item> items;     // guarded by mutex
+    std::vector<conv_item> old_items; // before them: out of the context by truncation, the client still has them (guarded by mutex)
     int                    n_marks = 0;
+
+    // the conversation state belongs to the thread that holds conv_mutex: the reader thread for a client event, the
+    // result loop to put the conversation in again after a slot error (recover); taken before mutex
+    std::mutex        conv_mutex;
+    std::atomic<bool> fault_pending{false}; // the result loop waits for conv_mutex
+    std::atomic<int>  n_faults{0};          // slot errors other than a full context since the last good response
+    int               n_clears = 0;         // CLEAR controls sent: a slot error from before the last one is void
+    bool              ctx_lost = false;     // the conversation is not in the slot, the next response puts it in again
+
+    // the response in progress, to start it again after a slot error
+    json resp_event;
+    bool resp_from_client = true;
+    int  resp_retries     = 0;
+    bool resp_tight       = false; // without the room kept for the answer: the turn to answer is all the context holds
 
     // the item being filled: its mark and turn state, set before its first content
     std::string pending_mark;
@@ -567,6 +628,12 @@ struct realtime_conversation {
         if (speaks_itself() && !deps.params.tts_voice.empty()) {
             voice = deps.params.tts_voice;
         }
+        // as the OpenAI API: a new session detects the turns and answers them, with speech if the model can speak
+        if (!can_speak()) {
+            out_mode = MTMD_HELPER_GEN_AUDIO_OUT_TEXT;
+        }
+        turn_params = server_turn_params();
+        turn_params->silence_duration_ms = 200;
     }
 
     //
@@ -579,17 +646,90 @@ struct realtime_conversation {
     }
 
     // event_id: of the client event that caused the error
-    void send_error_event(const std::string & message, const std::string & type_err, const std::string & code, const std::string & event_id) {
+    void send_error_event(const std::string & message, const std::string & type_err, const std::string & code, const std::string & event_id,
+                          const std::string & param = "") {
         send_event({
             {"type",  "error"},
-            {"error", {{"type", type_err}, {"code", code.empty() ? json(nullptr) : json(code)}, {"message", message}, {"param", nullptr},
+            {"error", {{"type", type_err}, {"code", code.empty() ? json(nullptr) : json(code)}, {"message", message},
+                       {"param", param.empty() ? json(nullptr) : json(param)},
                        {"event_id", event_id.empty() ? json(nullptr) : json(event_id)}}},
         });
     }
 
-    // an error of the client event being handled (reader thread)
-    void send_error(const std::string & message, const std::string & type_err = "invalid_request_error", const std::string & code = "") {
-        send_error_event(message, type_err, code, client_event_id);
+    // an error of the client event being handled
+    void send_error(const std::string & message, const std::string & type_err = "invalid_request_error", const std::string & code = "",
+                    const std::string & param = "") {
+        send_error_event(message, type_err, code, client_event_id, param);
+    }
+
+    // as the OpenAI API: a field the API does not have is an error; path: of the object in the client event
+    bool known_fields(const json & j, const std::string & path, const std::vector<const char *> & names) {
+        if (!j.is_object()) {
+            return true;
+        }
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            if (std::none_of(names.begin(), names.end(), [&](const char * n) { return it.key() == n; })) {
+                const std::string param = path.empty() ? it.key() : path + "." + it.key();
+                send_error("Unknown parameter: '" + param + "'.", "invalid_request_error", "unknown_parameter", param);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool tools_fields(const json & list, const std::string & path) {
+        for (size_t i = 0; list.is_array() && i < list.size(); i++) {
+            if (json_value(list[i], "type", std::string("function")) == "function" &&
+                !known_fields(list[i], path + "[" + std::to_string(i) + "]", {"type", "name", "description", "parameters"})) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // the fields of a session object; audio.output.language is not in the OpenAI API (a model that speaks itself)
+    bool session_fields(const json & s, bool realtime) {
+        using names = std::vector<const char *>;
+        const json audio = child(s, "audio");
+        const json in    = child(audio, "input");
+        const json out   = child(audio, "output");
+        const json turn  = child(in, "turn_detection");
+        const json trunc = child(s, "truncation");
+        const bool semantic = json_value(turn, "type", std::string()) == "semantic_vad";
+        return known_fields(s, "session", realtime ? names{"type", "audio", "include", "instructions", "max_output_tokens", "model",
+                                                           "output_modalities", "parallel_tool_calls", "prompt", "reasoning", "tool_choice",
+                                                           "tools", "tracing", "truncation"} :
+                                                     names{"type", "audio", "include"}) &&
+               known_fields(audio, "session.audio", realtime ? names{"input", "output"} : names{"input"}) &&
+               known_fields(in, "session.audio.input", {"format", "noise_reduction", "transcription", "turn_detection"}) &&
+               known_fields(child(in, "format"), "session.audio.input.format", {"type", "rate"}) &&
+               known_fields(child(in, "noise_reduction"), "session.audio.input.noise_reduction", {"type", "strength"}) &&
+               known_fields(child(in, "transcription"), "session.audio.input.transcription",
+                            {"delay", "keywords", "language", "languages", "model", "prompt"}) &&
+               known_fields(turn, "session.audio.input.turn_detection",
+                            semantic ? names{"type", "create_response", "eagerness", "interrupt_response"} :
+                                       names{"type", "create_response", "idle_timeout_ms", "interrupt_response", "prefix_padding_ms",
+                                             "silence_duration_ms", "threshold"}) &&
+               known_fields(out, "session.audio.output", {"format", "speed", "voice", "language"}) &&
+               known_fields(child(out, "format"), "session.audio.output.format", {"type", "rate"}) &&
+               known_fields(child(out, "voice"), "session.audio.output.voice", {"id"}) &&
+               known_fields(trunc, "session.truncation", {"type", "retention_ratio", "token_limits"}) &&
+               known_fields(child(trunc, "token_limits"), "session.truncation.token_limits", {"post_instructions"}) &&
+               known_fields(child(s, "tool_choice"), "session.tool_choice", {"type", "name", "server_label"}) &&
+               tools_fields(child(s, "tools"), "session.tools");
+    }
+
+    bool response_fields(const json & r) {
+        const json audio = child(r, "audio");
+        const json out   = child(audio, "output");
+        return known_fields(r, "response", {"audio", "conversation", "input", "instructions", "max_output_tokens", "metadata",
+                                            "output_modalities", "parallel_tool_calls", "prompt", "reasoning", "tool_choice", "tools"}) &&
+               known_fields(audio, "response.audio", {"output"}) &&
+               known_fields(out, "response.audio.output", {"format", "voice"}) &&
+               known_fields(child(out, "format"), "response.audio.output.format", {"type", "rate"}) &&
+               known_fields(child(out, "voice"), "response.audio.output.voice", {"id"}) &&
+               known_fields(child(r, "tool_choice"), "response.tool_choice", {"type", "name", "server_label"}) &&
+               tools_fields(child(r, "tools"), "response.tools");
     }
 
     // audio input through the ASR model: the model does not hear itself
@@ -684,6 +824,9 @@ struct realtime_conversation {
         task.params.control_text      = std::move(text);
         task.params.control_audio     = std::move(audio);
         task.params.control_response  = response;
+        if (action == SERVER_CONTROL_ACTION_CLEAR) {
+            n_clears++;
+        }
         ctl.post_task(std::move(task));
         auto result = ctl.next([this]() { return closed.load() || !conn.is_open(); });
         auto * res = result ? dynamic_cast<server_task_result_control *>(result.get()) : nullptr;
@@ -1196,7 +1339,7 @@ struct realtime_conversation {
                     {
                         send_event({{"type", "input_audio_buffer.speech_stopped"}, {"audio_end_ms", a.audio_ms},
                                     {"item_id", speech_item_id}});
-                        if (commit() && turn_params->create_response) {
+                        if (commit_turn() && type == "realtime" && turn_params->create_response) {
                             on_response_create(json::object(), false);
                         }
                     } break;
@@ -1206,7 +1349,7 @@ struct realtime_conversation {
                         const std::string item = "item_" + random_string();
                         send_event({{"type", "input_audio_buffer.timeout_triggered"}, {"audio_start_ms", a.audio_ms},
                                     {"audio_end_ms", a.audio_ms}, {"item_id", item}});
-                        if (turn_params->create_response && ensure_turn()) {
+                        if (type == "realtime" && turn_params->create_response && ensure_turn()) {
                             on_response_create(json::object(), false);
                         }
                     } break;
@@ -1298,9 +1441,8 @@ struct realtime_conversation {
                         {"error", {{"type", "transcription_error"}, {"code", nullptr}, {"message", "transcription failed"}, {"param", nullptr}}}});
             return;
         }
-        const int i = find_item(id);
-        if (i >= 0) {
-            items[i].item["content"][0]["transcript"] = text;
+        if (conv_item * it = any_item(id)) {
+            it->item["content"][0]["transcript"] = text;
         }
         send_event({{"type", "conversation.item.input_audio_transcription.delta"}, {"item_id", id}, {"content_index", 0}, {"delta", text}});
         send_event({{"type", "conversation.item.input_audio_transcription.completed"}, {"item_id", id}, {"content_index", 0},
@@ -1320,12 +1462,20 @@ struct realtime_conversation {
         if (type != "realtime" || transcription.is_null() || (!by_asr && !deps.transcribe)) {
             return;
         }
+        if (!by_asr && deps.params.n_parallel < 2) {
+            // the session holds the only slot, the transcription would wait for it until the session ends
+            std::lock_guard<std::mutex> lock(mutex);
+            send_event({{"type", "conversation.item.input_audio_transcription.failed"}, {"item_id", id}, {"content_index", 0},
+                        {"error", {{"type", "transcription_error"}, {"code", nullptr}, {"param", nullptr},
+                                   {"message", "the transcription needs a second slot (--parallel) or an ASR model (--asr-model)"}}}});
+            return;
+        }
         const std::string lang = json_value(transcription, "language", std::string());
         transcribers.emplace_back([this, id, lang, by_asr, pcm = std::move(pcm)]() {
             std::string text;
             int32_t n_in = 0, n_out = 0;
             const bool ok = by_asr ? deps.asr->transcribe(pcm, lang, text, n_in, n_out) :
-                                     deps.transcribe(pcm, model_in_rate, lang, text, n_in, n_out);
+                                     deps.transcribe(pcm, model_in_rate, lang, text, n_in, n_out, [this]() { return closed.load(); });
             if (closed) {
                 return;
             }
@@ -1342,8 +1492,16 @@ struct realtime_conversation {
                        std::to_string(ms) + " ms", "invalid_request_error", "input_audio_buffer_commit_empty");
             return;
         }
-        if (!commit() || type != "transcription") {
-            return;
+        commit_turn();
+    }
+
+    // the end of a user turn: its audio becomes an item, in a transcription session its text follows
+    bool commit_turn() {
+        if (!commit()) {
+            return false;
+        }
+        if (type != "transcription") {
+            return true;
         }
         if (cascade()) {
             // the ASR model has transcribed the buffer already, the slot only holds the turn header
@@ -1363,7 +1521,7 @@ struct realtime_conversation {
             send_event({{"type", "conversation.item.input_audio_transcription.completed"}, {"item_id", id}, {"content_index", 0},
                         {"transcript", text}, {"usage", transcription_usage(asr_in, asr_out)}});
             items.clear();
-            return;
+            return true;
         }
         // transcription: the committed audio is transcribed on its own, then the slot is cleared for the next one
         {
@@ -1376,19 +1534,20 @@ struct realtime_conversation {
         response.out_mode  = MTMD_HELPER_GEN_AUDIO_OUT_TEXT;
         response.sampling  = response_sampling(nullptr);
         if (!control(SERVER_CONTROL_ACTION_RESPONSE_CREATE, user_footer + assistant_header, {}, response)) {
-            return;
+            return false;
         }
         control(SERVER_CONTROL_ACTION_CLEAR);
         turn_open = false;
         n_turns   = 0;
         std::lock_guard<std::mutex> lock(mutex);
         items.clear();
+        return true;
     }
 
     // a client that interrupts the assistant cancels the response and truncates it right after: the cancelled
     // response ends within a few frames (its item is in the conversation then), the edit waits for it
     void wait_cancelled_response() {
-        for (int i = 0; i < 300 && responding && cancel_sent; i++) {
+        for (int i = 0; i < 300 && responding && cancel_sent && !fault_pending; i++) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
@@ -1419,31 +1578,91 @@ struct realtime_conversation {
             return false;
         }
         load_turn(pending_before);
-        audio_open = false;
-        std::vector<float> pcm = std::move(pending_pcm);
-        pending_pcm.clear();
-        auto asr = std::move(asr_turn); // cascade: the transcription of the buffer goes on as it is
-        asr_turn.reset();
+        audio_buf held = take_audio();
         const bool ok = edit();
+        return reopen_audio(std::move(held)) && ok;
+    }
+
+    struct audio_buf {
+        bool                             open = false;
+        std::vector<float>               pcm;
+        std::shared_ptr<server_asr_turn> asr; // cascade: the transcription of the buffer goes on as it is
+    };
+
+    // the open input audio buffer leaves the conversation state (the slot does not hold it any more)
+    audio_buf take_audio() {
+        audio_buf b{audio_open, std::move(pending_pcm), std::move(asr_turn)};
+        audio_open = false;
+        pending_pcm.clear();
+        asr_turn.reset();
+        return b;
+    }
+
+    // and opens again after the conversation as it is now, with the same audio
+    bool reopen_audio(audio_buf b) {
+        if (!b.open) {
+            return true;
+        }
         if (!begin_item() || !ensure_turn()) {
             return false;
         }
         audio_open  = true;
-        pending_pcm = std::move(pcm);
-        asr_turn    = std::move(asr);
-        if (!asr_turn && !pending_pcm.empty() && !control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, pending_pcm)) {
-            return false;
-        }
-        return ok;
+        pending_pcm = std::move(b.pcm);
+        asr_turn    = std::move(b.asr);
+        return asr_turn || pending_pcm.empty() || control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, pending_pcm);
     }
 
-    int find_item(const std::string & id) {
-        for (size_t i = 0; i < items.size(); i++) {
-            if (items[i].id == id) {
+    // the input audio buffer is empty again, what the slot holds of it is gone already
+    void reset_audio() {
+        audio_open  = false;
+        has_audio   = false;
+        buf_samples = 0;
+        pending_pcm.clear();
+        if (asr_turn) {
+            deps.asr->cancel(asr_turn);
+            asr_turn.reset();
+        }
+        speech_item_id.clear();
+        in_rs.reset(in_fmt.rate, model_in_rate);
+        reset_detector();
+    }
+
+    void reset_detector() {
+        detector.reset();
+        if (turn_params) {
+            detector = std::make_unique<server_turn_detector>(*turn_params, make_vad(), turn_model_for_session());
+        }
+    }
+
+    // the helpers below need the mutex held
+    static int find_in(const std::vector<conv_item> & list, const std::string & id) {
+        for (size_t i = 0; i < list.size(); i++) {
+            if (list[i].id == id) {
                 return (int) i;
             }
         }
         return -1;
+    }
+
+    // an item in the context
+    int find_item(const std::string & id) const {
+        return find_in(items, id);
+    }
+
+    // an item of the conversation, in the context or not
+    conv_item * any_item(const std::string & id) {
+        const int i = find_in(items, id);
+        const int o = i < 0 ? find_in(old_items, id) : -1;
+        return i >= 0 ? &items[i] : o >= 0 ? &old_items[o] : nullptr;
+    }
+
+    std::string last_id() const {
+        return !items.empty() ? items.back().id : !old_items.empty() ? old_items.back().id : "";
+    }
+
+    void send_added(const json & item, const json & prev) {
+        send_event({{"type", "conversation.item.added"}, {"previous_item_id", prev}, {"item", item}});
+        send_event({{"type", "conversation.item.done"},  {"previous_item_id", prev}, {"item", item}});
     }
 
     // goes back to item k and puts items k.. in again, after `change` edited them
@@ -1465,7 +1684,7 @@ struct realtime_conversation {
                 tail.assign(std::make_move_iterator(items.begin() + k), std::make_move_iterator(items.end()));
                 items.erase(items.begin() + k, items.end());
             }
-            last_item_id = items.empty() ? "" : items.back().id;
+            last_item_id = last_id();
         }
         if (changed) {
             drop_snapshots(k);
@@ -1596,7 +1815,7 @@ struct realtime_conversation {
             }
             tail.assign(std::make_move_iterator(items.begin() + s.ids.size()), std::make_move_iterator(items.end()));
             items.erase(items.begin() + s.ids.size(), items.end());
-            last_item_id = items.empty() ? "" : items.back().id;
+            last_item_id = last_id();
         }
         if (!control(SERVER_CONTROL_ACTION_SNAPSHOT_LOAD, s.name)) {
             std::lock_guard<std::mutex> lock(mutex);
@@ -1623,16 +1842,7 @@ struct realtime_conversation {
             }
             // the conversation changed under the snapshot: all of it goes in again
             drop_snapshots(0);
-            control(SERVER_CONTROL_ACTION_CLEAR);
-            load_turn({});
-            std::vector<conv_item> all;
-            {
-                std::lock_guard<std::mutex> lock(mutex);
-                all = std::move(items);
-                items.clear();
-                last_item_id.clear();
-            }
-            put_items(all, true);
+            put_conversation();
             return;
         }
         pending_restore = false;
@@ -1645,32 +1855,43 @@ struct realtime_conversation {
             return;
         }
         load_turn(restore_before);
-        std::vector<conv_item> all;
-        {
-            std::lock_guard<std::mutex> lock(mutex);
-            all = std::move(items);
-            items.clear();
-            last_item_id.clear();
-        }
+        std::vector<conv_item> all = take_items();
+        put_items(all, true);
+    }
+
+    // the items of the context leave the conversation, to go into the slot again
+    std::vector<conv_item> take_items() {
+        std::lock_guard<std::mutex> lock(mutex);
+        std::vector<conv_item> all = std::move(items);
+        items.clear();
+        last_item_id = last_id();
+        return all;
+    }
+
+    // the whole conversation goes into the slot again
+    void put_conversation() {
+        control(SERVER_CONTROL_ACTION_CLEAR);
+        load_turn({});
+        std::vector<conv_item> all = take_items();
         put_items(all, true);
     }
 
     void on_item_retrieve(const json & ev) {
         const std::string id = json_value(ev, "item_id", std::string());
         std::lock_guard<std::mutex> lock(mutex);
-        const int i = find_item(id);
-        if (i < 0) {
+        const conv_item * it = any_item(id);
+        if (!it) {
             send_error("conversation.item.retrieve: no item " + id, "invalid_request_error", "item_retrieve_invalid_item_id");
             return;
         }
         // audio content comes with its audio, in the format the client sent or got it
-        json item = items[i].item;
-        if (!items[i].audio.empty() && item.contains("content")) {
+        json item = it->item;
+        if (!it->audio.empty() && item.contains("content")) {
             for (auto & part : item["content"]) {
                 const std::string t = json_value(part, "type", std::string());
                 if (t == "input_audio" || t == "output_audio") {
-                    part["audio"]  = base64::encode(items[i].audio);
-                    part["format"] = items[i].audio_fmt.to_json();
+                    part["audio"]  = base64::encode(it->audio);
+                    part["format"] = it->audio_fmt.to_json();
                 }
             }
         }
@@ -1684,6 +1905,14 @@ struct realtime_conversation {
         {
             std::lock_guard<std::mutex> lock(mutex);
             i = find_item(id);
+            const int o = i < 0 ? find_in(old_items, id) : -1;
+            if (o >= 0) {
+                // out of the context already: the slot does not change
+                old_items.erase(old_items.begin() + o);
+                last_item_id = last_id();
+                send_event({{"type", "conversation.item.deleted"}, {"item_id", id}});
+                return;
+            }
         }
         if (i < 0) {
             send_error("conversation.item.delete: no item " + id, "invalid_request_error", "item_delete_invalid_item_id");
@@ -1707,17 +1936,20 @@ struct realtime_conversation {
         const int         part  = json_value(ev, "content_index", 0);
         const int64_t     end_ms = json_value(ev, "audio_end_ms", (int64_t) -1);
         int i;
+        bool found;
         int64_t n_samples = 0;
         int rate = 0;
         {
             std::lock_guard<std::mutex> lock(mutex);
             i = find_item(id);
-            if (i >= 0) {
-                n_samples = items[i].audio_samples;
-                rate      = items[i].audio_rate;
+            const conv_item * it = any_item(id);
+            found = it != nullptr;
+            if (it) {
+                n_samples = it->audio_samples;
+                rate      = it->audio_rate;
             }
         }
-        if (i < 0) {
+        if (!found) {
             send_error("conversation.item.truncate: no item " + id, "invalid_request_error", "item_truncate_invalid_item_id");
             return;
         }
@@ -1730,48 +1962,58 @@ struct realtime_conversation {
             send_error("conversation.item.truncate: audio_end_ms is beyond the audio of the item", "invalid_request_error", "invalid_value");
             return;
         }
-        if (!can_edit("conversation.item.truncate", true)) {
-            return;
-        }
-        const bool ok = edit_around_audio([&]() { return rebuild(i, [&](std::vector<conv_item> & tail) {
-            for (auto & it : tail) {
-                if (it.id != id) {
-                    continue;
-                }
-                // the transcript is cut in proportion to the audio heard, at a word boundary
-                json & content = it.item["content"];
-                std::string tr = content.size() > 0 ? json_value(content[0], "transcript", std::string()) : std::string();
-                const int64_t end_s = end_ms * rate / 1000;
-                size_t keep = n_samples > 0 ? (size_t) ((double) tr.size() * end_s / n_samples) : tr.size();
-                if (!it.spoken.empty()) {
-                    // a voice spoke the text piece by piece: whole pieces up to the end, the piece in progress in proportion
-                    int64_t s0 = 0, t0 = 0;
-                    keep = tr.size();
-                    for (const auto & [s1, t1] : it.spoken) {
-                        if (end_s < s1) {
-                            keep = (size_t) (t0 + (t1 - t0) * (end_s - s0) / std::max<int64_t>(1, s1 - s0));
-                            break;
-                        }
-                        s0 = s1;
-                        t0 = t1;
+        bool ok = false;
+        if (i < 0) {
+            // out of the context: the slot does not change
+            std::lock_guard<std::mutex> lock(mutex);
+            if (conv_item * it = any_item(id)) {
+                truncate_audio(*it, end_ms);
+                ok = true;
+            }
+        } else if (can_edit("conversation.item.truncate", true)) {
+            ok = edit_around_audio([&]() { return rebuild(i, [&](std::vector<conv_item> & tail) {
+                for (auto & it : tail) {
+                    if (it.id == id) {
+                        truncate_audio(it, end_ms);
                     }
                 }
-                if (keep < tr.size()) {
-                    const size_t sp = tr.rfind(' ', keep);
-                    keep = sp == std::string::npos ? 0 : sp;
-                }
-                if (content.size() > 0) {
-                    content[0]["transcript"] = ""; // as OpenAI: no text the user did not hear
-                }
-                it.text          = tr.substr(0, keep); // what goes back into the conversation
-                it.audio_samples = end_ms * rate / 1000;
-                const size_t bps = it.audio_fmt.type == "audio/pcm" ? 2 : 1;
-                it.audio.resize(std::min(it.audio.size(), (size_t) it.audio_samples * bps));
-            }
-        }); });
+            }); });
+        }
         if (ok) {
             send_event({{"type", "conversation.item.truncated"}, {"item_id", id}, {"content_index", part}, {"audio_end_ms", end_ms}});
         }
+    }
+
+    // the transcript of an assistant item is cut in proportion to the audio heard, at a word boundary
+    static void truncate_audio(conv_item & it, int64_t end_ms) {
+        json & content = it.item["content"];
+        std::string tr = content.size() > 0 ? json_value(content[0], "transcript", std::string()) : std::string();
+        const int64_t end_s = end_ms * it.audio_rate / 1000;
+        size_t keep = it.audio_samples > 0 ? (size_t) ((double) tr.size() * end_s / it.audio_samples) : tr.size();
+        if (!it.spoken.empty()) {
+            // a voice spoke the text piece by piece: whole pieces up to the end, the piece in progress in proportion
+            int64_t s0 = 0, t0 = 0;
+            keep = tr.size();
+            for (const auto & [s1, t1] : it.spoken) {
+                if (end_s < s1) {
+                    keep = (size_t) (t0 + (t1 - t0) * (end_s - s0) / std::max<int64_t>(1, s1 - s0));
+                    break;
+                }
+                s0 = s1;
+                t0 = t1;
+            }
+        }
+        if (keep < tr.size()) {
+            const size_t sp = tr.rfind(' ', keep);
+            keep = sp == std::string::npos ? 0 : sp;
+        }
+        if (content.size() > 0) {
+            content[0]["transcript"] = ""; // as OpenAI: no text the user did not hear
+        }
+        it.text          = tr.substr(0, keep); // what goes back into the conversation
+        it.audio_samples = end_s;
+        const size_t bps = it.audio_fmt.type == "audio/pcm" ? 2 : 1;
+        it.audio.resize(std::min(it.audio.size(), (size_t) it.audio_samples * bps));
     }
 
     // the audio not committed yet leaves the conversation
@@ -1783,26 +2025,20 @@ struct realtime_conversation {
             }
             load_turn(pending_before);
         }
-        audio_open  = false;
-        has_audio   = false;
-        buf_samples = 0;
-        pending_pcm.clear();
-        if (asr_turn) {
-            deps.asr->cancel(asr_turn);
-            asr_turn.reset();
-        }
-        speech_item_id.clear();
-        in_rs.reset(in_fmt.rate, model_in_rate);
-        if (detector && turn_params) {
-            detector = std::make_unique<server_turn_detector>(*turn_params, make_vad(), turn_model_for_session());
-        }
+        reset_audio();
         send_event({{"type", "input_audio_buffer.cleared"}});
     }
 
-    // an item from the client, as it goes into the conversation
-    bool parse_client_item(const json & item, conv_item & it, std::string & err) {
+    // an item from the client, as it goes into the conversation; path: of the item in the client event
+    // false: err says why, or it is empty and the error is sent already (unknown field)
+    bool parse_client_item(const json & item, const std::string & path, conv_item & it, std::string & err) {
         const std::string type = json_value(item, "type", std::string("message"));
         const std::string role = json_value(item, "role", std::string());
+        if (!known_fields(item, path, type == "function_call_output" ? std::vector<const char *>{"id", "type", "status", "call_id", "output"} :
+                                      type == "function_call" ? std::vector<const char *>{"id", "type", "status", "name", "call_id", "arguments"} :
+                                                                std::vector<const char *>{"id", "type", "status", "role", "content"})) {
+            return false;
+        }
         it.id = item.contains("id") && item["id"].is_string() ? item["id"].get<std::string>() : "item_" + random_string();
         if (type == "function_call_output") {
             it.kind = conv_item::TOOL_OUTPUT;
@@ -1823,8 +2059,14 @@ struct realtime_conversation {
         }
         json content = json::array();
         std::string text;
-        for (const auto & p : item.value("content", json::array())) {
+        const json parts_in = item.value("content", json::array());
+        for (size_t i = 0; parts_in.is_array() && i < parts_in.size(); i++) {
+            const json & p = parts_in[i];
             const std::string t = json_value(p, "type", std::string());
+            if (!known_fields(p, path + ".content[" + std::to_string(i) + "]",
+                              t == "input_audio" ? std::vector<const char *>{"type", "audio", "transcript"} : std::vector<const char *>{"type", "text"})) {
+                return false;
+            }
             if ((role == "user" || role == "system") && t == "input_text") {
                 text += json_value(p, "text", std::string());
                 content.push_back({{"type", t}, {"text", json_value(p, "text", std::string())}});
@@ -1878,23 +2120,22 @@ struct realtime_conversation {
         }
         conv_item it;
         std::string err;
-        if (!parse_client_item(ev.value("item", json::object()), it, err)) {
-            send_error("conversation.item.create: " + err, "invalid_request_error", "invalid_value");
+        if (!parse_client_item(ev.value("item", json::object()), "item", it, err)) {
+            if (!err.empty()) {
+                send_error("conversation.item.create: " + err, "invalid_request_error", "invalid_value");
+            }
             return;
         }
         {
             std::lock_guard<std::mutex> lock(mutex);
-            if (find_item(it.id) >= 0) {
+            if (any_item(it.id)) {
                 send_error("conversation.item.create: an item with id " + it.id + " already exists", "invalid_request_error",
                            "item_create_duplicate_item_id");
                 return;
             }
             if (it.kind == conv_item::TOOL_OUTPUT) {
                 const std::string call_id = json_value(it.item, "call_id", std::string());
-                const bool known = std::any_of(items.begin(), items.end(), [&](const conv_item & c) {
-                    return json_value(c.item, "type", std::string()) == "function_call" && json_value(c.item, "call_id", std::string()) == call_id;
-                });
-                if (!known) {
+                if (find_call(items, call_id) < 0 && find_call(old_items, call_id) < 0) {
                     send_error("conversation.item.create: no tool call " + call_id + " in the conversation", "invalid_request_error",
                                "invalid_tool_call_id");
                     return;
@@ -1904,31 +2145,56 @@ struct realtime_conversation {
         // previous_item_id: insert after that item ("root": before the first one), the items after it go in again
         if (ev.contains("previous_item_id") && ev["previous_item_id"].is_string() && ev["previous_item_id"] != last_item_id) {
             const std::string prev = ev["previous_item_id"];
-            int i = -1;
             if (prev != "root") {
                 std::lock_guard<std::mutex> lock(mutex);
-                i = find_item(prev);
-                if (i < 0) {
+                if (!any_item(prev)) {
                     send_error("conversation.item.create: no item " + prev, "invalid_request_error", "item_create_invalid_previous_item_id");
                     return;
                 }
             }
-            if (!can_edit("conversation.item.create", true)) {
-                return;
-            }
-            const json out      = it.item;
-            const json prev_out = prev == "root" ? json(nullptr) : json(prev);
-            const bool ok = edit_around_audio([&]() {
-                return rebuild(i + 1, [&](std::vector<conv_item> & tail) { tail.insert(tail.begin(), std::move(it)); });
-            });
-            if (ok) {
-                send_event({{"type", "conversation.item.added"}, {"previous_item_id", prev_out}, {"item", out}});
-                send_event({{"type", "conversation.item.done"},  {"previous_item_id", prev_out}, {"item", out}});
-            }
+            insert_item(std::move(it), prev);
             return;
         }
         // audio not committed yet stays in the buffer, the item goes in before it
         edit_around_audio([&]() { return append_client_item(std::move(it)); });
+    }
+
+    // the function call with this call_id in a list of items (mutex held)
+    static int find_call(const std::vector<conv_item> & list, const std::string & call_id) {
+        for (size_t i = 0; i < list.size(); i++) {
+            if (json_value(list[i].item, "type", std::string()) == "function_call" && json_value(list[i].item, "call_id", std::string()) == call_id) {
+                return (int) i;
+            }
+        }
+        return -1;
+    }
+
+    // a new item after the item `prev` ("root": before the first one), the items after it go in again
+    bool insert_item(conv_item it, const std::string & prev) {
+        const json out      = it.item;
+        const json prev_out = prev == "root" ? json(nullptr) : json(prev);
+        int i = -1;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            i = prev == "root" ? -1 : find_item(prev);
+            const int o = prev == "root" || i >= 0 ? -1 : find_in(old_items, prev);
+            if (prev == "root" ? !old_items.empty() : o >= 0 && o + 1 < (int) old_items.size()) {
+                // among the items out of the context: it stays out with them, the slot does not change
+                old_items.insert(old_items.begin() + o + 1, std::move(it));
+                send_added(out, prev_out);
+                return true;
+            }
+        }
+        if (!can_edit("conversation.item.create", true)) {
+            return false;
+        }
+        const bool ok = edit_around_audio([&]() {
+            return rebuild(i + 1, [&](std::vector<conv_item> & tail) { tail.insert(tail.begin(), std::move(it)); });
+        });
+        if (ok) {
+            send_added(out, prev_out);
+        }
+        return ok;
     }
 
     // a new item at the end of the conversation
@@ -1972,10 +2238,52 @@ struct realtime_conversation {
         return true;
     }
 
-    // the result of a tool call of the last response, the next response answers it
+    // the result of a tool call: the chat template has it right after the response that called the tool, so it goes
+    // there, after the results that response has already, also when other items came since
     bool on_tool_output(conv_item it) {
-        if (!has_tool_text || n_turns == 0 || turn_open) {
-            send_error("conversation.item.create: a function call output must follow the response that called it");
+        if (!has_tool_text) {
+            send_error("conversation.item.create: the chat template has no tool results");
+            return false;
+        }
+        const std::string call_id = json_value(it.item, "call_id", std::string());
+        // the last item of the response with the call and of its results
+        auto end_of = [](const std::vector<conv_item> & list, size_t c) {
+            size_t e = c;
+            while (e + 1 < list.size() && list[e + 1].kind == conv_item::ASSISTANT && list[e + 1].response_id == list[c].response_id) {
+                e++;
+            }
+            while (e + 1 < list.size() && list[e + 1].kind == conv_item::TOOL_OUTPUT) {
+                e++;
+            }
+            return e;
+        };
+        std::string prev;
+        bool        last = false;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            const int c = find_call(items, call_id);
+            const int o = c < 0 ? find_call(old_items, call_id) : -1;
+            if (c >= 0) {
+                const size_t e = end_of(items, c);
+                prev = items[e].id;
+                last = e + 1 == items.size();
+            } else if (o >= 0) {
+                // the call is out of the context: so is its result
+                const size_t e = end_of(old_items, o);
+                const json out = it.item;
+                prev = old_items[e].id;
+                old_items.insert(old_items.begin() + e + 1, std::move(it));
+                send_added(out, prev);
+                return true;
+            } else {
+                return false;
+            }
+        }
+        if (!last) {
+            return insert_item(std::move(it), prev);
+        }
+        if (turn_open) {
+            send_error("conversation.item.create: a function call output cannot go into an open user turn");
             return false;
         }
         if (!put_item(it)) {
@@ -2006,23 +2314,30 @@ struct realtime_conversation {
             }
         }
         if (has_input) {
-            for (const auto & in : resp["input"]) {
+            for (size_t n = 0; n < resp["input"].size(); n++) {
+                const json &      in   = resp["input"][n];
+                const std::string path = "response.input[" + std::to_string(n) + "]";
                 if (json_value(in, "type", std::string()) == "item_reference") {
+                    if (!known_fields(in, path, {"type", "id"})) {
+                        return false;
+                    }
                     std::lock_guard<std::mutex> lock(mutex);
-                    const int i = find_item(json_value(in, "id", std::string()));
-                    if (i < 0) {
+                    const conv_item * ref = any_item(json_value(in, "id", std::string()));
+                    if (!ref) {
                         send_error("response.create: no item " + json_value(in, "id", std::string()), "invalid_request_error",
                                    "invalid_reference_item_id");
                         return false;
                     }
-                    ctx_items.push_back(items[i]);
+                    ctx_items.push_back(*ref);
                     ctx_items.back().response_id += "_ref"; // a referenced response item goes in on its own
                     continue;
                 }
                 conv_item it;
                 std::string err;
-                if (!parse_client_item(in, it, err)) {
-                    send_error("response.create: input: " + err, "invalid_request_error", "invalid_value");
+                if (!parse_client_item(in, path, it, err)) {
+                    if (!err.empty()) {
+                        send_error("response.create: input: " + err, "invalid_request_error", "invalid_value");
+                    }
                     return false;
                 }
                 ctx_items.push_back(std::move(it));
@@ -2109,25 +2424,34 @@ struct realtime_conversation {
     }
 
     // from_client: the client asked for it, else the turn detection
-    void on_response_create(const json & ev, bool from_client = true) {
+    // again: the response in progress starts again after a slot error (recover), the client has its response.created
+    // false: no response runs
+    bool on_response_create(const json & ev, bool from_client = true, bool again = false) {
         if (type == "transcription") {
             send_error("response.create: not supported in a transcription session");
-            return;
-        }
-        // one response at a time; a response the client just cancelled ends first
-        wait_cancelled_response();
-        if (responding) {
-            if (from_client) {
-                send_error("response.create: the conversation already has an active response in progress: " + response_id,
-                           "invalid_request_error", "conversation_already_has_active_response");
-            }
-            return;
+            return false;
         }
         const json resp = ev.value("response", json::object());
+        if (!again) {
+            // one response at a time; a response the client just cancelled ends first
+            wait_cancelled_response();
+            if (responding) {
+                if (from_client) {
+                    send_error("response.create: the conversation already has an active response in progress: " + response_id,
+                               "invalid_request_error", "conversation_already_has_active_response");
+                }
+                return false;
+            }
+            if (!response_fields(resp)) {
+                return false;
+            }
+            resp_retries = 0;
+            resp_tight   = false;
+        }
         const std::string conversation = json_value(resp, "conversation", std::string("auto"));
         if (conversation != "auto" && conversation != "none") {
             send_error("response.create: conversation must be \"auto\" or \"none\"", "invalid_request_error", "invalid_value");
-            return;
+            return false;
         }
         const bool oob = conversation == "none";
 
@@ -2142,7 +2466,7 @@ struct realtime_conversation {
             std::string err;
             if (!parse_tools(resp["tools"], resp_tools, err)) {
                 send_error("response.create: " + err, "invalid_request_error", "invalid_value");
-                return;
+                return false;
             }
             resp_tools_json = resp["tools"];
         }
@@ -2154,7 +2478,7 @@ struct realtime_conversation {
             std::string err;
             if (!parse_output_modalities(resp["output_modalities"], mode, err)) {
                 send_error("response.create: " + err, "invalid_request_error", "invalid_value");
-                return;
+                return false;
             }
         }
         // audio.output of the response: its own format and voice
@@ -2169,7 +2493,7 @@ struct realtime_conversation {
             std::string err;
             if (resp_audio.contains("format") && !parse_audio_format(resp_audio["format"], new_resp_fmt, err)) {
                 send_error("response.create: audio.output." + err, "invalid_request_error", "invalid_value");
-                return;
+                return false;
             }
             if (resp_audio.contains("voice")) {
                 const json & v = resp_audio["voice"];
@@ -2182,22 +2506,30 @@ struct realtime_conversation {
         }
         if (!can_speak() && mode != MTMD_HELPER_GEN_AUDIO_OUT_TEXT && mode != MTMD_HELPER_GEN_AUDIO_OUT_AUTO) {
             send_error("response.create: the model cannot generate audio, start the server with --voice-model");
-            return;
+            return false;
         }
         if (!deps.cap.text_gen && mode != MTMD_HELPER_GEN_AUDIO_OUT_AUDIO && mode != MTMD_HELPER_GEN_AUDIO_OUT_AUTO) {
             send_error("response.create: the model cannot generate text");
-            return;
+            return false;
         }
         // audio not committed yet belongs to this turn
-        if (has_audio && !commit()) {
-            return;
+        if (!again && has_audio && !commit()) {
+            return false;
+        }
+        if (ctx_lost) {
+            // the conversation did not fit before: one more try, the client may have deleted items
+            ctx_lost = false;
+            audio_buf held = take_audio();
+            reset_context();
+            put_conversation();
+            reopen_audio(std::move(held));
         }
         if (fresh && !put_response_context(resp, has_input, resp_instructions, resp_tools, resp_tools_json)) {
-            return;
+            return false;
         }
         // an empty conversation: the assistant speaks first, after an empty user turn
         if (at_start() && !ensure_turn()) {
-            return;
+            return false;
         }
 
         common_chat_tool_choice choice = tool_choice;
@@ -2205,7 +2537,7 @@ struct realtime_conversation {
             std::string err;
             if (!parse_tool_choice(resp["tool_choice"], choice, err)) {
                 send_error("response.create: " + err, "invalid_request_error", "invalid_value");
-                return;
+                return false;
             }
         }
 
@@ -2216,8 +2548,9 @@ struct realtime_conversation {
         response.n_predict = max_output_tokens;
         if (resp.contains("max_output_tokens") && !parse_max_output_tokens(resp["max_output_tokens"], response.n_predict)) {
             send_error("response.create: max_output_tokens must be an integer or \"inf\"", "invalid_request_error", "invalid_value");
-            return;
+            return false;
         }
+        response.n_limit = resp_tight ? 0 : response_limit(response.n_predict);
         // an audio response carries its transcript: the model speaks interleaved with the text it says, or a voice
         // model speaks the text of the model
         const bool use_voice       = deps.voices && (mode == MTMD_HELPER_GEN_AUDIO_OUT_AUDIO || mode == MTMD_HELPER_GEN_AUDIO_OUT_MIXED);
@@ -2247,7 +2580,7 @@ struct realtime_conversation {
             } catch (const std::exception & e) {
                 if (!tools.empty()) {
                     send_error(std::string("response.create: ") + e.what(), "server_error");
-                    return;
+                    return false;
                 }
                 chat.reset(); // without tools the raw text goes out
             }
@@ -2256,8 +2589,10 @@ struct realtime_conversation {
 
         {
             std::lock_guard<std::mutex> lock(mutex);
-            response_id      = "resp_" + random_string();
-            response_item_id = "item_" + random_string();
+            if (!again) {
+                response_id      = "resp_" + random_string();
+                response_item_id = "item_" + random_string();
+            }
             response_text.clear();
             response_transcript.clear();
             transcript_mode = with_transcript;
@@ -2298,28 +2633,34 @@ struct realtime_conversation {
             if (can_speak()) {
                 response_meta["audio"] = {{"output", {{"format", resp_fmt.to_json()}, {"voice", resp_voice}}}};
             }
-            send_event({{"type", "response.created"}, {"response", response_json("in_progress", nullptr, nullptr)}});
+            if (!again) {
+                send_event({{"type", "response.created"}, {"response", response_json("in_progress", nullptr, nullptr)}});
+            }
         }
         if (!begin_item()) {
-            return;
+            return false;
         }
         {
             std::lock_guard<std::mutex> lock(mutex);
             resp_mark   = pending_mark;
             resp_before = pending_before;
         }
+        if (!again) {
+            resp_event       = ev;
+            resp_from_client = from_client;
+        }
         responding     = true;
         cancel_sent    = false;
         cancel_by_turn = false;
         if (!control(SERVER_CONTROL_ACTION_RESPONSE_CREATE, prompt, {}, response)) {
             responding = false;
-            return;
+            return false;
         }
         if (oob && !fresh) {
             // out of the conversation: back to the mark once the response is done, the slot runs the controls in order
             control(SERVER_CONTROL_ACTION_ROLLBACK, resp_mark);
             load_turn(resp_before);
-            return;
+            return true;
         }
         // the response ends the turn, its tokens are in the slot; the footer goes in before the next turn
         next_header  = assistant_footer;
@@ -2327,6 +2668,7 @@ struct realtime_conversation {
         tool_results = false;
         system_last  = false;
         n_turns++;
+        return true;
     }
 
     // the whole update is checked first: a rejected update changes nothing and gets only an error
@@ -2350,6 +2692,14 @@ struct realtime_conversation {
                 reject("the session type cannot change after the first audio or message");
                 return;
             }
+        }
+        if (!session_fields(session, new_type == "realtime")) {
+            return;
+        }
+        truncation_params new_trunc = trunc;
+        if (session.contains("truncation") && !parse_truncation(session["truncation"], new_trunc, err)) {
+            reject(err);
+            return;
         }
         std::string new_instructions = instructions;
         if (session.contains("instructions") && session["instructions"].is_string()) {
@@ -2466,6 +2816,7 @@ struct realtime_conversation {
             speed = out["speed"].get<double>();
         }
         truncation = session.value("truncation", truncation);
+        trunc      = new_trunc;
         tracing    = session.value("tracing", tracing);
         include    = session.value("include", include);
         prompt     = session.value("prompt", prompt);
@@ -2479,10 +2830,7 @@ struct realtime_conversation {
         }
         if (in.contains("turn_detection")) {
             turn_params = new_turn;
-            detector.reset();
-            if (turn_params) {
-                detector = std::make_unique<server_turn_detector>(*turn_params, make_vad(), turn_model_for_session());
-            }
+            reset_detector();
         }
         if (rerender && !rebuild(0, [](std::vector<conv_item> &) {})) {
             return;
@@ -2527,17 +2875,7 @@ struct realtime_conversation {
             }
             if (!responding) {
                 restore_conversation();
-                std::deque<held_event> held;
-                held.swap(held_events);
-                for (auto & h : held) {
-                    if (!h.msg.empty()) {
-                        handle(h.msg);
-                    } else if (holding()) {
-                        held_events.push_back(std::move(h)); // a replayed event started another such response
-                    } else {
-                        run_turn_actions(h.actions);
-                    }
-                }
+                run_held();
             }
         }
         client_event_id = ev.is_object() ? json_value(ev, "event_id", std::string()) : std::string();
@@ -2545,7 +2883,39 @@ struct realtime_conversation {
         client_event_id.clear();
     }
 
+    // the client events that waited for a response with its own context
+    void run_held() {
+        std::deque<held_event> held;
+        held.swap(held_events);
+        for (auto & h : held) {
+            if (!h.msg.empty()) {
+                handle(h.msg);
+            } else if (holding()) {
+                held_events.push_back(std::move(h)); // a replayed event started another such response
+            } else {
+                run_turn_actions(h.actions);
+            }
+        }
+    }
+
     void dispatch(const std::string & t, const json & ev) {
+        static const std::map<std::string, std::vector<const char *>> fields = {
+            {"session.update",               {"type", "event_id", "session"}},
+            {"transcription_session.update", {"type", "event_id", "session"}},
+            {"input_audio_buffer.append",    {"type", "event_id", "audio"}},
+            {"input_audio_buffer.commit",    {"type", "event_id"}},
+            {"input_audio_buffer.clear",     {"type", "event_id"}},
+            {"conversation.item.create",     {"type", "event_id", "previous_item_id", "item"}},
+            {"conversation.item.retrieve",   {"type", "event_id", "item_id"}},
+            {"conversation.item.delete",     {"type", "event_id", "item_id"}},
+            {"conversation.item.truncate",   {"type", "event_id", "item_id", "content_index", "audio_end_ms"}},
+            {"response.create",              {"type", "event_id", "response"}},
+            {"response.cancel",              {"type", "event_id", "response_id"}},
+        };
+        const auto known = fields.find(t);
+        if (known != fields.end() && !known_fields(ev, "", known->second)) {
+            return;
+        }
         if (t == "session.update" || t == "transcription_session.update") {
             on_session_update(ev);
         } else if (t == "input_audio_buffer.append") {
@@ -2854,7 +3224,12 @@ struct realtime_conversation {
 
         std::string status       = "completed";
         json        details      = nullptr;
-        if (res.cancelled) {
+        if (res.fault) {
+            status  = "failed";
+            details = {{"type", "failed"}, {"error", {{"type", res.fault_full ? "invalid_request_error" : "server_error"},
+                                                      {"code", res.fault_full ? json("context_length_exceeded") : json(nullptr)},
+                                                      {"message", res.fault_message}}}};
+        } else if (res.cancelled) {
             status  = "cancelled";
             details = {{"type", "cancelled"}, {"reason", cancel_by_turn ? "turn_detected" : "client_cancelled"}};
         } else if (res.truncated) {
@@ -2894,7 +3269,7 @@ struct realtime_conversation {
                         {"output_index", idx}, {"call_id", item["call_id"]}, {"name", item["name"]}, {"arguments", item["arguments"]}});
         }
         for (size_t i = 0; i < output.size(); i++) {
-            output[i]["status"] = status == "cancelled" ? "incomplete" : status;
+            output[i]["status"] = status == "completed" ? "completed" : "incomplete";
             // as OpenAI: an out-of-band item gets conversation.item.done (no added) and stays out of the conversation
             send_event({{"type", "conversation.item.done"}, {"previous_item_id", i > 0 ? output[i - 1]["id"] : json(nullptr)},
                         {"item", output[i]}});
@@ -2929,6 +3304,9 @@ struct realtime_conversation {
         responding     = false;
         response_ended = true;
         voice_resp     = false;
+        if (!res.fault) {
+            n_faults = 0;
+        }
         // the context window of the conversation stands in for the token budget
         send_event({{"type", "rate_limits.updated"}, {"rate_limits", json::array({{
             {"name", "tokens"}, {"limit", res.n_ctx}, {"remaining", std::max(0, res.n_ctx - res.n_past)}, {"reset_seconds", 0},
@@ -2937,10 +3315,217 @@ struct realtime_conversation {
     }
 
     //
+    // slot errors and truncation
+    //
+
+    // about the tokens of the instructions and tools: the text before the first user turn
+    int32_t n_instructions() const {
+        return (int32_t) common_tokenize(deps.vocab, first_header, false, true).size();
+    }
+
+    // the size the conversation can have when a response starts, 0: all of the context
+    // a quarter of the context stays free for the answer, or its max_output_tokens if that is less
+    int32_t response_limit(int32_t n_predict) const {
+        if (!trunc.on) {
+            return 0;
+        }
+        const int32_t n_ctx = deps.meta.slot_n_ctx;
+        int32_t limit = n_ctx - (n_predict > 0 ? std::min(n_predict, n_ctx / 4) : n_ctx / 4);
+        if (trunc.limit > 0) {
+            limit = std::min(limit, n_instructions() + trunc.limit);
+        }
+        return limit;
+    }
+
+    // truncation: the oldest turns leave the context until the rest takes the retention ratio of the limit, one turn at
+    // least; the client keeps their items. The sizes come from the marks of the slot, without them a share of the turns goes.
+    // keep_last: the last turn stays. Returns the number of items that left
+    size_t truncate_items(const server_task_result_realtime & f, bool keep_last) {
+        std::lock_guard<std::mutex> lock(mutex);
+        // a turn starts at a message or at the first item of a response; tool results stay with their response
+        std::vector<size_t> starts;
+        for (size_t i = 0; i < items.size(); i++) {
+            const bool same = i > 0 && items[i].kind == conv_item::ASSISTANT && items[i - 1].kind == conv_item::ASSISTANT &&
+                              items[i].response_id == items[i - 1].response_id;
+            if (i == 0 || (!same && items[i].kind != conv_item::TOOL_OUTPUT)) {
+                starts.push_back(i);
+            }
+        }
+        const size_t n_max = starts.size() - (keep_last && !starts.empty() ? 1 : 0);
+        if (n_max == 0) {
+            return 0;
+        }
+        auto pos_of = [&](size_t turn) {
+            for (const auto & m : f.marks) {
+                if (m.first == items[starts[turn]].mark) {
+                    return m.second;
+                }
+            }
+            return -1;
+        };
+        const int32_t full   = trunc.limit > 0 ? std::min(f.n_ctx, n_instructions() + trunc.limit) : f.n_ctx;
+        const int32_t target = std::min((int32_t) (trunc.ratio * full), f.n_ctx - f.n_ctx / 4);
+        size_t n = 1;
+        if (pos_of(0) < 0) {
+            // the slot holds another context (a response with its own)
+            n = starts.size() - (size_t) (trunc.ratio * starts.size());
+        } else {
+            const int32_t n_sys = n_instructions();
+            for (; n < n_max; n++) {
+                // a turn the slot did not get to has no mark: what stays is as good as empty
+                const int32_t pos = pos_of(n);
+                if (pos < 0 || n_sys + f.n_past - pos <= target) {
+                    break;
+                }
+            }
+        }
+        n = std::max<size_t>(1, std::min(n, n_max));
+        // the context does not start with an answer if a user turn can come first
+        while (n < n_max && items[starts[n]].kind == conv_item::ASSISTANT) {
+            n++;
+        }
+        const size_t n_items = n < starts.size() ? starts[n] : items.size();
+        old_items.insert(old_items.end(), std::make_move_iterator(items.begin()), std::make_move_iterator(items.begin() + n_items));
+        items.erase(items.begin(), items.begin() + n_items);
+        return n_items;
+    }
+
+    // back to the context of the session if a response with its own was in the slot; the snapshots go
+    void reset_context() {
+        if (pending_restore) {
+            pending_restore = false;
+            snap_restore    = false;
+            instructions = saved_instructions;
+            tools        = saved_tools;
+            tools_json   = saved_tools_json;
+            configure();
+        }
+        own_ctx      = {};
+        session_snap = {};
+        control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, "session");
+        for (const auto & snap : snapshots) {
+            control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, snap.name);
+        }
+        snapshots.clear();
+    }
+
+    // the result that ends the response in progress after a slot error (mutex held)
+    server_task_result_realtime failed_result(const server_task_result_realtime & f) {
+        server_task_result_realtime res = held_done ? *held_done : server_task_result_realtime();
+        held_done.reset();
+        res.response_done = true;
+        res.fault         = true;
+        res.fault_full    = f.fault_full;
+        res.fault_message = f.fault_message;
+        res.n_ctx         = f.n_ctx;
+        res.n_past        = f.n_past;
+        return res;
+    }
+
+    // a control of the slot failed (result loop)
+    void on_fault(const server_task_result_realtime & f) {
+        fault_pending = true;
+        std::lock_guard<std::mutex> conv(conv_mutex);
+        fault_pending = false;
+        SRV_WRN("realtime session %s: %s\n", id.c_str(), f.fault_message.c_str());
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (!transcribe_item_id.empty()) {
+                send_event({{"type", "conversation.item.input_audio_transcription.failed"}, {"item_id", transcribe_item_id}, {"content_index", 0},
+                            {"error", {{"type", "transcription_error"}, {"code", nullptr}, {"message", f.fault_message}, {"param", nullptr}}}});
+                transcribe_item_id.clear();
+            }
+        }
+        if (f.n_clears != n_clears) {
+            return; // a CLEAR sent since then starts the conversation again
+        }
+        if (type == "transcription") {
+            // each buffer is transcribed on its own, the one in progress is lost
+            control(SERVER_CONTROL_ACTION_CLEAR);
+            load_turn({});
+            reset_audio();
+            send_error_event(f.fault_message, f.fault_full ? "invalid_request_error" : "server_error",
+                             f.fault_full ? "context_length_exceeded" : "", "");
+            send_event({{"type", "input_audio_buffer.cleared"}});
+            return;
+        }
+        recover(f);
+    }
+
+    // the slot runs nothing until the next CLEAR: the response in progress starts again or fails, old items leave a
+    // context that was full, then the conversation goes into the slot again (conv_mutex held)
+    void recover(const server_task_result_realtime & f) {
+        bool lost   = f.fault_full ? !trunc.on : ++n_faults > 1; // no way to put the conversation in again
+        bool report = !f.fault_full || lost;                     // with an error event, unless a response fails with the error
+        bool retry  = false;
+        if (responding) {
+            cancel_voice();
+            std::lock_guard<std::mutex> lock(mutex);
+            if (cancel_sent) {
+                server_task_result_realtime res = failed_result(f);
+                res.fault     = false;
+                res.cancelled = true;
+                finish_response(res);
+            } else if (output.empty() && !llm_done && !lost && (f.fault_full || resp_retries++ == 0)) {
+                retry = true; // the client got nothing of it yet
+            } else {
+                finish_response(failed_result(f));
+                report = false;
+            }
+        }
+        if (f.fault_full && trunc.on && truncate_items(f, true) == 0) {
+            // the last turn is all the context holds
+            if (retry && !resp_tight) {
+                resp_tight = true;
+            } else if (audio_open && !pending_pcm.empty()) {
+                reset_audio();
+                send_error_event("the audio of the input audio buffer does not fit in the context, the buffer is cleared",
+                                 "invalid_request_error", "context_length_exceeded", "");
+                send_event({{"type", "input_audio_buffer.cleared"}});
+            } else {
+                // the turn does not fit on its own: it leaves the context without an answer
+                retry  = false;
+                report = true;
+                lost   = truncate_items(f, false) == 0;
+            }
+        }
+        if (responding && !retry) {
+            std::lock_guard<std::mutex> lock(mutex);
+            finish_response(failed_result(f));
+            report = false;
+        }
+        if (report) {
+            send_error_event(f.fault_message, f.fault_full ? "invalid_request_error" : "server_error",
+                             f.fault_full ? "context_length_exceeded" : "", "");
+        }
+        reset_context();
+        if (lost) {
+            ctx_lost = true; // the next response tries again
+            if (!holding()) {
+                run_held();
+            }
+            return;
+        }
+        audio_buf held = take_audio();
+        put_conversation();
+        if (retry) {
+            responding = false;
+            if (!on_response_create(resp_event, resp_from_client, true)) {
+                std::lock_guard<std::mutex> lock(mutex);
+                finish_response(failed_result(f));
+            }
+        }
+        reopen_audio(std::move(held));
+        if (!holding()) {
+            run_held();
+        }
+    }
+
+    //
     // session
     //
 
-    // an error of the slot ends the session
+    // an error of the task ends the session
     void send_slot_error(const json & err) {
         const bool full = json_value(err, "type", std::string()) == "exceed_context_size_error";
         send_error_event(json_value(err, "message", std::string("server error")), full ? "invalid_request_error" : "server_error",
@@ -2984,9 +3569,11 @@ struct realtime_conversation {
         send_event({{"type", "session.created"}, {"session", session_json()}});
 
         // client events are handled on this thread, results are sent from the loop below
+        reset_detector();
         std::thread reader([this]() {
             std::string msg;
             while (conn.read(msg) != 0) {
+                std::lock_guard<std::mutex> lock(conv_mutex);
                 try {
                     handle(msg);
                 } catch (const std::exception & e) {
@@ -3008,7 +3595,11 @@ struct realtime_conversation {
             }
             if (auto * res = dynamic_cast<server_task_result_realtime *>(result.get())) {
                 try {
-                    on_result(*res);
+                    if (res->fault) {
+                        on_fault(*res);
+                    } else {
+                        on_result(*res);
+                    }
                 } catch (const std::exception & e) {
                     send_error_event(e.what(), "server_error", "", "");
                     break;
@@ -3106,7 +3697,6 @@ bool server_realtime_slot::decode(const llama_token * tokens, const float * rows
     const int32_t n_embd  = llama_model_n_embd_inp(model);
     const int32_t n_batch = llama_n_batch(ctx);
     if (n_past + n >= n_ctx) {
-        error_n_tokens = n_past + n;
         return fail("the conversation does not fit in the context", ERROR_TYPE_EXCEED_CONTEXT_SIZE);
     }
     for (int32_t i0 = 0; i0 < n; i0 += n_batch) {
@@ -3174,7 +3764,6 @@ bool server_realtime_slot::audio_whole() {
         return fail("failed to tokenize the audio of the turn");
     }
     if (n_past + mtmd_helper_get_n_pos(chunks.ptr.get()) >= n_ctx) {
-        error_n_tokens = n_past + (int32_t) mtmd_helper_get_n_pos(chunks.ptr.get());
         return fail("the conversation does not fit in the context", ERROR_TYPE_EXCEED_CONTEXT_SIZE);
     }
     int32_t n_rows = 0;
@@ -3212,6 +3801,13 @@ bool server_realtime_slot::response_start(const server_realtime_op & op) {
     cancelled   = false;
     truncated   = false;
 
+    // the answer needs room: with a limit the session takes old items out of the conversation and asks again
+    const llama_tokens toks = common_tokenize(vocab, op.text, false, true);
+    const int32_t      n_in = n_past + (int32_t) toks.size();
+    if (n_in + 8 >= n_ctx || (op.response.n_limit > 0 && n_in > op.response.n_limit)) {
+        return fail("the conversation does not leave room for the response in the context", ERROR_TYPE_EXCEED_CONTEXT_SIZE);
+    }
+
     if (gen.valid()) {
         // the gen-audio pipeline continues the conversation and follows the model's text/audio switching
         mtmd_helper::gen_audio::inp inp;
@@ -3247,7 +3843,6 @@ bool server_realtime_slot::response_start(const server_realtime_op & op) {
         const float * h = llama_get_embeddings_ith(ctx, -1);
         h_state.assign(h, h + llama_model_n_embd(model));
     } else {
-        const llama_tokens toks = common_tokenize(vocab, op.text, false, true);
         if (toks.empty()) {
             return fail("failed to start the response");
         }
@@ -3418,10 +4013,35 @@ bool server_realtime_slot::load_snapshot(const std::string & name) {
     return true;
 }
 
-bool server_realtime_slot::update() {
+void server_realtime_slot::update() {
     // the hidden states drive the audio of a model that speaks itself; a text model needs no embeddings
     llama_set_embeddings(ctx, gen.valid());
 
+    if (run()) {
+        return;
+    }
+    // what the slot holds is not the conversation of the session any more
+    auto res = std::make_unique<server_task_result_realtime>();
+    res->id            = id_task;
+    res->index         = index;
+    res->fault         = true;
+    res->fault_full    = error_type == ERROR_TYPE_EXCEED_CONTEXT_SIZE;
+    res->fault_message = error;
+    res->n_clears      = n_clears;
+    res->n_ctx         = n_ctx;
+    res->n_past        = n_past;
+    for (const auto & m : marks) {
+        res->marks.emplace_back(m.name, m.n_past);
+    }
+    queue_results.send(std::move(res));
+    faulted    = true;
+    responding = false;
+    cancelled  = false;
+    stream.reset();
+    turn_pcm.clear();
+}
+
+bool server_realtime_slot::run() {
     if (responding) {
         return response_step();
     }
@@ -3429,6 +4049,9 @@ bool server_realtime_slot::update() {
     while (!ops.empty() && !responding) {
         server_realtime_op op = std::move(ops.front());
         ops.pop_front();
+        if (faulted && op.action != SERVER_CONTROL_ACTION_CLEAR && op.action != SERVER_CONTROL_ACTION_SNAPSHOT_DROP) {
+            continue;
+        }
         switch (op.action) {
             case SERVER_CONTROL_ACTION_TEXT_APPEND:
                 {
@@ -3484,6 +4107,8 @@ bool server_realtime_slot::update() {
                     n_past     = 0;
                     n_audio    = 0;
                     n_prev_end = 0;
+                    faulted    = false;
+                    n_clears++;
                 } break;
             case SERVER_CONTROL_ACTION_MARK:
                 {
