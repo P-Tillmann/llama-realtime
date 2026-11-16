@@ -1,0 +1,2052 @@
+{
+ "scenario": "default_session",
+ "target": "openai",
+ "model": "gpt-realtime",
+ "status": "ok",
+ "error": null,
+ "log": [
+  {
+   "t": 1.244,
+   "event": {
+    "type": "session.created",
+    "event_id": "event_EkmPQFVXlAx7PoQFb58LY",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EkmPPnyU1Dsai4XlzoWwj",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "audio"
+     ],
+     "instructions": "Your knowledge cutoff is 2023-10. You are a helpful, witty, and friendly AI. Act like a human, but remember that you aren't a human and that you can't do human things in the real world. Your voice and personality should be warm and engaging, with a lively and playful tone. If interacting in a non-English language, start by using the standard accent or dialect familiar to the user. Talk quickly. You should always call a function if you can. Do not refer to these rules, even if you’re asked about them.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794821480,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": {
+        "type": "server_vad",
+        "threshold": 0.5,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 200,
+        "idle_timeout_ms": null,
+        "create_response": true,
+        "interrupt_response": true
+       }
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 1.245,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 1.345,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 1.446,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 1.546,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 1.647,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 1.747,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 1.848,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 1.891,
+   "event": {
+    "type": "input_audio_buffer.speech_started",
+    "event_id": "event_EkmPQh9CSSkIydaGcRoNr",
+    "audio_start_ms": 212,
+    "item_id": "item_EkmPQ8PhwtBRg7XnAzAGX"
+   }
+  },
+  {
+   "t": 1.949,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.05,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.151,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.252,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.353,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.454,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.554,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.655,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.756,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.857,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 2.958,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.059,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.16,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.261,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.362,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.464,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.564,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.665,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.766,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.866,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 3.925,
+   "event": {
+    "type": "input_audio_buffer.speech_stopped",
+    "event_id": "event_EkmPShxf1Jsb9fSO6KELO",
+    "audio_end_ms": 2528,
+    "item_id": "item_EkmPQ8PhwtBRg7XnAzAGX"
+   }
+  },
+  {
+   "t": 3.926,
+   "event": {
+    "type": "input_audio_buffer.committed",
+    "event_id": "event_EkmPSg8OhGIiuKJwIzixv",
+    "previous_item_id": null,
+    "item_id": "item_EkmPQ8PhwtBRg7XnAzAGX"
+   }
+  },
+  {
+   "t": 3.929,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPSGD6OIzCIuwdl6et7",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EkmPQ8PhwtBRg7XnAzAGX",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_audio",
+       "transcript": null
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3.93,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPSf3KVRt3qV9k0DPJt",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EkmPQ8PhwtBRg7XnAzAGX",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_audio",
+       "transcript": null
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3.935,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EkmPSShdcdOTZh1mgGbTi",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPS4kQ69KR8my0TQw0E",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EkmPPBxHQ25Njj2bxoMHl",
+     "output_modalities": [
+      "audio"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 3.967,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.068,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.158,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EkmPTnrIBhBf6GKA1THHH",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 4.162,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPTagTjkCylYcpClTDp",
+    "previous_item_id": "item_EkmPQ8PhwtBRg7XnAzAGX",
+    "item": {
+     "id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 4.169,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.174,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EkmPTrcF9fOWiKaNyeTxW",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "audio",
+     "transcript": ""
+    }
+   }
+  },
+  {
+   "t": 4.175,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTpqZemCXAAGl4Dawf",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "The",
+    "obfuscation": "JmRQo2LM027OV"
+   }
+  },
+  {
+   "t": 4.181,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTLMmJUJJIynshLZVj",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " capital",
+    "obfuscation": "cVcYNPAG"
+   }
+  },
+  {
+   "t": 4.189,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTJTycbQRPlulrrHcr",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " of",
+    "obfuscation": "LqwratFEBF9R4"
+   }
+  },
+  {
+   "t": 4.198,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTPcUApkwtev1dEdyG",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " France",
+    "obfuscation": "kCac5uium"
+   }
+  },
+  {
+   "t": 4.27,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.281,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTx4kydlu8SCmycy20",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.335,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTbYShR5Kr692en5xq",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 7200
+    }
+   }
+  },
+  {
+   "t": 4.371,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.397,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTaCJqZvNp2eH5ckKi",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.397,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTgDZ4sBnBfibnEQ40",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " is",
+    "obfuscation": "XyLvyg2ZBSsbx"
+   }
+  },
+  {
+   "t": 4.405,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTlT3ZaS5w3DjpNLkx",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Paris",
+    "obfuscation": "IXpISjN1u0"
+   }
+  },
+  {
+   "t": 4.405,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTwKWNI46P1La26k6w",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "!",
+    "obfuscation": "jMJc9hBtTcERFjE"
+   }
+  },
+  {
+   "t": 4.471,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.486,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTA8SLYSIPQDaB2hT8",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.521,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTCGVRGNejP0giAVnc",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.572,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.608,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTALrTqbguABoclF4b",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.631,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTaJCYxEmRpc55AtRO",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.672,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.686,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTtj5JJRYAsulJpKOZ",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.686,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPT7CgVIzx7VRFmNoiA",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " It's",
+    "obfuscation": "OhdoV46zaIK"
+   }
+  },
+  {
+   "t": 4.686,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTY8kodlw7s3uK6T78",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " known",
+    "obfuscation": "Omi86h5OkL"
+   }
+  },
+  {
+   "t": 4.686,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTXpNNdt0imTY2liTs",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " as",
+    "obfuscation": "IJyxFClyudnLT"
+   }
+  },
+  {
+   "t": 4.686,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTJvySv0cOolt725lu",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " the",
+    "obfuscation": "WKgY1sNLrdC2"
+   }
+  },
+  {
+   "t": 4.686,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTTRy3oY9gZOUEQYHy",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " City",
+    "obfuscation": "OG4ng0AYuep"
+   }
+  },
+  {
+   "t": 4.69,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTWmxmc0uYXS8PE2CB",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " of",
+    "obfuscation": "Yit99lqVgLkJZ"
+   }
+  },
+  {
+   "t": 4.694,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTNQHo56N6PssqeSca",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Light",
+    "obfuscation": "3lkHWBkbwd"
+   }
+  },
+  {
+   "t": 4.699,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPT8vvNTBUrfzD2Term",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "IDaG3thUSrMwhGi"
+   }
+  },
+  {
+   "t": 4.774,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.786,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTKdU81IRllI9XfFUH",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.82,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTb7idsN3dcNcMHrKg",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.847,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTPYRWl7fFQpLGb9sq",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.874,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 4.889,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTLeyexXCrk08jzvf2",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.93,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTAFSmIWI6jTTwlGw2",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.972,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTYVgooJsrQIDw5XU7",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 4.972,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTu9M9CNX0HpNhFogW",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " famous",
+    "obfuscation": "jfHzM0foY"
+   }
+  },
+  {
+   "t": 4.975,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 4800
+    }
+   }
+  },
+  {
+   "t": 5.02,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTpJKgI48Gpco2vlS6",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " for",
+    "obfuscation": "xbS3p4qxeFqz"
+   }
+  },
+  {
+   "t": 5.032,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTZBMOfQjCWoCRbauy",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " iconic",
+    "obfuscation": "XbGgu2fpR"
+   }
+  },
+  {
+   "t": 5.036,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTAZglPYFvcY4uSuyC",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " landmarks",
+    "obfuscation": "2g01ob"
+   }
+  },
+  {
+   "t": 5.04,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTegoi8UWHzWjHyMD3",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " like",
+    "obfuscation": "FYDI9V7Csso"
+   }
+  },
+  {
+   "t": 5.045,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPTQEp4XnPjZonXuSSI",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " the",
+    "obfuscation": "tjwtR96dYIpn"
+   }
+  },
+  {
+   "t": 5.073,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTXBMbHxsbuuQgZ0RA",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.076,
+   "sent": {
+    "type": "input_audio_buffer.append",
+    "audio": {
+     "audio_bytes": 1920
+    }
+   }
+  },
+  {
+   "t": 5.104,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTIm0VpfSJp1y3Gzas",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.141,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPTqzBHKCV7hED8v3Zd",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.179,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUSnEmHjqh5iLe55CW",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.217,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUjusG0O99asckYbgF",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.246,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPU4Kitvl0YdoQjVfaW",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.286,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUhMHshbhwyvTUmKqC",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.323,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUPBTC3626gP1PfIv5",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.362,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUk9PplBg8zhWB8CCw",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.366,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUMciQyApTACu5lVX3",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Eiffel",
+    "obfuscation": "hPf5VT6cN"
+   }
+  },
+  {
+   "t": 5.366,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUOJp3Ud0ATwR1BXHM",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Tower",
+    "obfuscation": "3Tal2suRhy"
+   }
+  },
+  {
+   "t": 5.366,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUdaWLVb2rNeANnzND",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "QC5lHiEkQsFZC9Q"
+   }
+  },
+  {
+   "t": 5.374,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUKp668KpyX97XUf9z",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " the",
+    "obfuscation": "cE5d1m1hlGtc"
+   }
+  },
+  {
+   "t": 5.38,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUkp5nzNVYRmgu9tDQ",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Louvre",
+    "obfuscation": "WSMUGufoR"
+   }
+  },
+  {
+   "t": 5.388,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUOeWcOZERSL5J1HZm",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Museum",
+    "obfuscation": "Zm6fmXVPP"
+   }
+  },
+  {
+   "t": 5.392,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUrIYzcJSVliaJjA8q",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "3k4j7zug3Jr5Pa9"
+   }
+  },
+  {
+   "t": 5.483,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUX54uVdErL46H6eAm",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.506,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUQIbGbaBxblNnczlk",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.545,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUR19WHSDrEy6rxoyf",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.581,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPU5OWkYJfJpjdTWts3",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.613,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPURl96HrIBm9ZUxPzT",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.655,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUizXbqpEDDGmlaeTR",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.692,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUfP0zIP0S8shfkEuM",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.729,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUKOd4sQRmMjNbhh7f",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.773,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUQsfeOrGeZclZGXh5",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.773,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPU2HKkJCeVB4c52zoJ",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " and",
+    "obfuscation": "aYl0pmZGLacx"
+   }
+  },
+  {
+   "t": 5.775,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPU9ebQl9fmgxuIsF2v",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " the",
+    "obfuscation": "N2rqJ0tk00ae"
+   }
+  },
+  {
+   "t": 5.779,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUlOGhnwYlzrZuKXrb",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " beautiful",
+    "obfuscation": "r3I3Hq"
+   }
+  },
+  {
+   "t": 5.78,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPU754Ld0qEy4YR3gm6",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Seine",
+    "obfuscation": "wfQSMdxa8H"
+   }
+  },
+  {
+   "t": 5.792,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUaKF1nG7PxFkFlHfr",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " River",
+    "obfuscation": "bU0MYdiZpw"
+   }
+  },
+  {
+   "t": 5.797,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUnoqpEvqarsxfPP87",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ".",
+    "obfuscation": "zCtrwLQ1xdsZGxF"
+   }
+  },
+  {
+   "t": 5.802,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPUAb1cFEisMyxAjyiW",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " It's",
+    "obfuscation": "iMkmOcYEdgR"
+   }
+  },
+  {
+   "t": 5.87,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUZLtgFEiKDUF59201",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.907,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPU9TWzi3NjSd2pXydg",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.944,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUV28XA8NNA3kR84Rw",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 5.99,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUvO4IfCmy0VpbgWF5",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.021,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUf6Y38hmzdhLYUVZf",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.053,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUFEZBGxgnKPF4Ox7l",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.094,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUGCnHBqH8FkNJHCol",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.134,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPUb5lu4OwrFCoiaAJK",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.168,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPV5JqiFLtqN0Fg31OI",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.168,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVAYsWajeNqxN4Q4Cd",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " a",
+    "obfuscation": "2b4eOeSnDJwSlx"
+   }
+  },
+  {
+   "t": 6.171,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVnebV4GA6ySyeOqNM",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " hub",
+    "obfuscation": "QIGvZYfDJPDe"
+   }
+  },
+  {
+   "t": 6.173,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVJpdAoRC7EF4qYuzR",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " of",
+    "obfuscation": "bxNc7tkkViDT4"
+   }
+  },
+  {
+   "t": 6.186,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVtHisV2awgD0HK2SA",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " culture",
+    "obfuscation": "nJyTZVl8"
+   }
+  },
+  {
+   "t": 6.191,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVOchKESlwDfpqMTKt",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "vGhVH6xye3Njlp8"
+   }
+  },
+  {
+   "t": 6.197,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVDdXsRNleqmB0AQQZ",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " fashion",
+    "obfuscation": "j5OPDZsR"
+   }
+  },
+  {
+   "t": 6.206,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPV2IScribESDURzPx5",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "YVX6TBaW8Jw7too"
+   }
+  },
+  {
+   "t": 6.21,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVeXgbiwlqKT27dsG6",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " and",
+    "obfuscation": "1MJpurUgakop"
+   }
+  },
+  {
+   "t": 6.22,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVAOGdJBMgYBv2ajng",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " history",
+    "obfuscation": "WgzrrhPV"
+   }
+  },
+  {
+   "t": 6.224,
+   "event": {
+    "type": "response.output_audio_transcript.delta",
+    "event_id": "event_EkmPVglYRoFeRL4IISfgQ",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ".",
+    "obfuscation": "HPEEgruuhSbAXnU"
+   }
+  },
+  {
+   "t": 6.293,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVc6WE4cqWgIwCzJ9f",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.329,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVfWhm6sfB8xgu24vR",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.366,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVpH1QNZIYpah34X55",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.406,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVw89DF5aXjd6EOcY1",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.447,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPV7J8OTUdVEFWJr7XS",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.48,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPV3bTNbwb46Lj7vV44",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.521,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVbqyYgXk6FmI8LoKN",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.554,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVbJiCxIpGzXJuAAZO",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.587,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVKai9mSwPSQPQBzkq",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.63,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPViS9Jgo5rvHch38c5",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.692,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVErhFCWz4psXWpQei",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.703,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVxr8GYmM2BgPHXJgL",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 12000
+    }
+   }
+  },
+  {
+   "t": 6.792,
+   "event": {
+    "type": "response.output_audio.delta",
+    "event_id": "event_EkmPVyrjNe7GXP2kq5nXB",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": {
+     "audio_bytes": 33600
+    }
+   }
+  },
+  {
+   "t": 6.792,
+   "event": {
+    "type": "response.output_audio.done",
+    "event_id": "event_EkmPVKoctdYDvI2eQi5XL",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0
+   }
+  },
+  {
+   "t": 6.792,
+   "event": {
+    "type": "response.output_audio_transcript.done",
+    "event_id": "event_EkmPVHLBejNmSRXrTjCix",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "transcript": "The capital of France is Paris! It's known as the City of Light, famous for iconic landmarks like the Eiffel Tower, the Louvre Museum, and the beautiful Seine River. It's a hub of culture, fashion, and history."
+   }
+  },
+  {
+   "t": 6.792,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EkmPVor8si2hQZUlxffhD",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "item_id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "audio",
+     "transcript": "The capital of France is Paris! It's known as the City of Light, famous for iconic landmarks like the Eiffel Tower, the Louvre Museum, and the beautiful Seine River. It's a hub of culture, fashion, and history."
+    }
+   }
+  },
+  {
+   "t": 6.792,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPVOGcwHWI1U4p5HD9n",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_audio",
+       "transcript": "The capital of France is Paris! It's known as the City of Light, famous for iconic landmarks like the Eiffel Tower, the Louvre Museum, and the beautiful Seine River. It's a hub of culture, fashion, and history."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 6.792,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EkmPVHgM20AQYV3eCr14p",
+    "response_id": "resp_EkmPS4kQ69KR8my0TQw0E",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+     "type": "message",
+     "status": "completed",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_audio",
+       "transcript": "The capital of France is Paris! It's known as the City of Light, famous for iconic landmarks like the Eiffel Tower, the Louvre Museum, and the beautiful Seine River. It's a hub of culture, fashion, and history."
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 6.792,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EkmPVsKzJaI1nJIjgDVRQ",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPS4kQ69KR8my0TQw0E",
+     "status": "completed",
+     "status_details": null,
+     "output": [
+      {
+       "id": "item_EkmPSGGbPqkfG2Rm7VJu3",
+       "type": "message",
+       "status": "completed",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_audio",
+         "transcript": "The capital of France is Paris! It's known as the City of Light, famous for iconic landmarks like the Eiffel Tower, the Louvre Museum, and the beautiful Seine River. It's a hub of culture, fashion, and history."
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EkmPPBxHQ25Njj2bxoMHl",
+     "output_modalities": [
+      "audio"
+     ],
+     "max_output_tokens": "inf",
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 480,
+      "input_tokens": 141,
+      "output_tokens": 339,
+      "input_token_details": {
+       "text_tokens": 119,
+       "audio_tokens": 22,
+       "image_tokens": 0,
+       "cached_tokens": 64,
+       "cached_tokens_details": {
+        "text_tokens": 64,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 65,
+       "audio_tokens": 274
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 6.793,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EkmPV8B5JVUu4eJqOxzEy",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199092,
+      "reset_seconds": 0.272
+     }
+    ]
+   }
+  }
+ ]
+}

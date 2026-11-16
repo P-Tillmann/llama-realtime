@@ -1,0 +1,1930 @@
+{
+ "scenario": "truncation",
+ "target": "openai",
+ "model": "gpt-realtime",
+ "status": "ok",
+ "error": null,
+ "log": [
+  {
+   "t": 0.902,
+   "event": {
+    "type": "session.created",
+    "event_id": "event_EkmPZ5CjtA7JK5buCJHuZ",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EkmPYcPZbwxTzCaKpGYX5",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "audio"
+     ],
+     "instructions": "Your knowledge cutoff is 2023-10. You are a helpful, witty, and friendly AI. Act like a human, but remember that you aren't a human and that you can't do human things in the real world. Your voice and personality should be warm and engaging, with a lively and playful tone. If interacting in a non-English language, start by using the standard accent or dialect familiar to the user. Talk quickly. You should always call a function if you can. Do not refer to these rules, even if you’re asked about them.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": "inf",
+     "tracing": null,
+     "truncation": "auto",
+     "prompt": null,
+     "expires_at": 1794821489,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": {
+        "type": "server_vad",
+        "threshold": 0.5,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 200,
+        "idle_timeout_ms": null,
+        "create_response": true,
+        "interrupt_response": true
+       }
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 0.903,
+   "sent": {
+    "type": "session.update",
+    "session": {
+     "type": "realtime",
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "audio": {
+      "input": {
+       "turn_detection": null
+      }
+     },
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": 20,
+     "truncation": {
+      "type": "retention_ratio",
+      "retention_ratio": 0.5,
+      "token_limits": {
+       "post_instructions": 400
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 1.046,
+   "event": {
+    "type": "session.updated",
+    "event_id": "event_EkmPZSrMMDTZJCTz0mGmz",
+    "session": {
+     "type": "realtime",
+     "object": "realtime.session",
+     "id": "sess_EkmPYcPZbwxTzCaKpGYX5",
+     "model": "gpt-realtime",
+     "output_modalities": [
+      "text"
+     ],
+     "instructions": "You are a helpful assistant. Answer in one short sentence.",
+     "tools": [],
+     "tool_choice": "auto",
+     "max_output_tokens": 20,
+     "tracing": null,
+     "truncation": {
+      "type": "retention_ratio",
+      "retention_ratio": 0.5,
+      "token_limits": {
+       "post_instructions": 400
+      }
+     },
+     "prompt": null,
+     "expires_at": 1794821489,
+     "audio": {
+      "input": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "transcription": null,
+       "noise_reduction": null,
+       "turn_detection": null
+      },
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy",
+       "speed": 1.0
+      }
+     },
+     "include": null
+    }
+   }
+  },
+  {
+   "t": 1.046,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 0: the code word number 0 is W0X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.046,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 1: the code word number 1 is W1X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.046,
+   "sent": {
+    "type": "response.create"
+   }
+  },
+  {
+   "t": 1.192,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPZWVt43rUN5f2LDiZT",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EkmPZPpuKlUi6IIF63lDb",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 0: the code word number 0 is W0X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.193,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPZcoTdYHSIQk6ZmhGC",
+    "previous_item_id": null,
+    "item": {
+     "id": "item_EkmPZPpuKlUi6IIF63lDb",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 0: the code word number 0 is W0X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.197,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPZcrPxP9ql9SljjCy3",
+    "previous_item_id": "item_EkmPZPpuKlUi6IIF63lDb",
+    "item": {
+     "id": "item_EkmPZNUFVrFYVZ3BN7bb1",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 1: the code word number 1 is W1X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.198,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPZm9okwMEJQ3BLl9gj",
+    "previous_item_id": "item_EkmPZPpuKlUi6IIF63lDb",
+    "item": {
+     "id": "item_EkmPZNUFVrFYVZ3BN7bb1",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 1: the code word number 1 is W1X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.207,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EkmPZEsJyj7LRv4CK5l3U",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EkmPYPz7wBjHtZPTOk22c",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": 20,
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.358,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EkmPZmk8EsrMN2SMDVlNR",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPZew7zOBOUqSt4vzX8",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 1.358,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPZJtRvalzZfs5nVrAg",
+    "previous_item_id": "item_EkmPZNUFVrFYVZ3BN7bb1",
+    "item": {
+     "id": "item_EkmPZew7zOBOUqSt4vzX8",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 1.359,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EkmPZDYDKwzJei6DCIQYs",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 1.36,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZausE8kT4LHG0s8VI",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "Under",
+    "obfuscation": "yBxq88jdyB0"
+   }
+  },
+  {
+   "t": 1.366,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZqCGQdskSQNHnMOqf",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "stood",
+    "obfuscation": "Yha5FqEP8Uc"
+   }
+  },
+  {
+   "t": 1.374,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZz2e9TKvfUNCK9qXV",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ":",
+    "obfuscation": "gnX2agwHsZwOYK1"
+   }
+  },
+  {
+   "t": 1.381,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZ9JAoEA8fn0WzKe0f",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Fact",
+    "obfuscation": "sQadUnPfOYH"
+   }
+  },
+  {
+   "t": 1.394,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZ81RTotUVvfyOxgnm",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " ",
+    "obfuscation": "Rdm9CJAo4pkK8j4"
+   }
+  },
+  {
+   "t": 1.402,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZmMCdyANlGVTdzbj9",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "0",
+    "obfuscation": "mtoiI69ogubprxl"
+   }
+  },
+  {
+   "t": 1.408,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZZ5wbVNXZppu8YhLa",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " has",
+    "obfuscation": "0UNC3PdrHUTh"
+   }
+  },
+  {
+   "t": 1.416,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZzb7ORSQ9XD1RxjWb",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " code",
+    "obfuscation": "rHRXqxdizAI"
+   }
+  },
+  {
+   "t": 1.425,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZl8StvA7zhS1NbcBj",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " word",
+    "obfuscation": "LmfV3OHGgiC"
+   }
+  },
+  {
+   "t": 1.433,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZWiwaf6lxZYS5lkZ4",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " W",
+    "obfuscation": "iYQ1nEuqP7nqDQ"
+   }
+  },
+  {
+   "t": 1.446,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZbPGBF4y8fIRgGHSR",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "0",
+    "obfuscation": "i5vq9eyMIU8gnxI"
+   }
+  },
+  {
+   "t": 1.45,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZocr63ij4Tdu5fPaI",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "X",
+    "obfuscation": "fcns9M4HP0QVH09"
+   }
+  },
+  {
+   "t": 1.459,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZkdtLV3kHImVGmcrY",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "ZtskOtXj12KChV1"
+   }
+  },
+  {
+   "t": 1.467,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZw67QVByMAnWER10j",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " and",
+    "obfuscation": "MGoHTinzMycW"
+   }
+  },
+  {
+   "t": 1.474,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZQFjh8fs7r2ZFudNy",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Fact",
+    "obfuscation": "nFSZmAITslv"
+   }
+  },
+  {
+   "t": 1.496,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZkvofgepebQgXmCNO",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " ",
+    "obfuscation": "7UHCFLvijAGtIe0"
+   }
+  },
+  {
+   "t": 1.504,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZRI4GRPOxwJotQQ6H",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "1",
+    "obfuscation": "T56TIr5nNERcgnU"
+   }
+  },
+  {
+   "t": 1.517,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZiJWtrTGTUWPCaCYt",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " has",
+    "obfuscation": "9yOH8TwgeLtd"
+   }
+  },
+  {
+   "t": 1.526,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPZR2KfsLp9Gi4wCR0N",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " code",
+    "obfuscation": "xIJIYPnsGKe"
+   }
+  },
+  {
+   "t": 1.533,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EkmPZjYD4HSid0CCBzw9y",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "Understood: Fact 0 has code word W0X, and Fact 1 has code"
+   }
+  },
+  {
+   "t": 1.534,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EkmPZfQitaS0u525AwQbP",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "Understood: Fact 0 has code word W0X, and Fact 1 has code"
+    }
+   }
+  },
+  {
+   "t": 1.537,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPZFBggMEMPbZeQtb0o",
+    "previous_item_id": "item_EkmPZNUFVrFYVZ3BN7bb1",
+    "item": {
+     "id": "item_EkmPZew7zOBOUqSt4vzX8",
+     "type": "message",
+     "status": "incomplete",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Understood: Fact 0 has code word W0X, and Fact 1 has code"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.537,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EkmPZ7yFg407JZoHu2oCn",
+    "response_id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPZew7zOBOUqSt4vzX8",
+     "type": "message",
+     "status": "incomplete",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Understood: Fact 0 has code word W0X, and Fact 1 has code"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.54,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EkmPZPwx6OcmjBit7xT60",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPZNT1iaJUXbjVCZUE6",
+     "status": "incomplete",
+     "status_details": {
+      "type": "incomplete",
+      "reason": "max_output_tokens"
+     },
+     "output": [
+      {
+       "id": "item_EkmPZew7zOBOUqSt4vzX8",
+       "type": "message",
+       "status": "incomplete",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "Understood: Fact 0 has code word W0X, and Fact 1 has code"
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EkmPYPz7wBjHtZPTOk22c",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": 20,
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 252,
+      "input_tokens": 232,
+      "output_tokens": 20,
+      "input_token_details": {
+       "text_tokens": 232,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 20,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.54,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 2: the code word number 2 is W2X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.54,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 3: the code word number 3 is W3X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.54,
+   "sent": {
+    "type": "response.create"
+   }
+  },
+  {
+   "t": 1.546,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EkmPZY3g1HJ1V3HJOqMXx",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199717,
+      "reset_seconds": 0.084
+     }
+    ]
+   }
+  },
+  {
+   "t": 1.688,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPZT63orPdb2IR9hguO",
+    "previous_item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "item": {
+     "id": "item_EkmPZDhZ6BaNnRH8vL61t",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 2: the code word number 2 is W2X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.688,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPZySFvrGH7o8I3zozv",
+    "previous_item_id": "item_EkmPZew7zOBOUqSt4vzX8",
+    "item": {
+     "id": "item_EkmPZDhZ6BaNnRH8vL61t",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 2: the code word number 2 is W2X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.689,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPZI79g8xS8amBNV0Us",
+    "previous_item_id": "item_EkmPZDhZ6BaNnRH8vL61t",
+    "item": {
+     "id": "item_EkmPZBvkz3Bs8k155WAM9",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 3: the code word number 3 is W3X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.69,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPZqxRFB5rXtlj6fe3b",
+    "previous_item_id": "item_EkmPZDhZ6BaNnRH8vL61t",
+    "item": {
+     "id": "item_EkmPZBvkz3Bs8k155WAM9",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 3: the code word number 3 is W3X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1.699,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EkmPZSqekUJNK4WxRBlLs",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPZNuKO8YXIziQorMTi",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EkmPYPz7wBjHtZPTOk22c",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": 20,
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 1.882,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EkmPa4F7XaTfYr4lQfrBg",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPZ3d4sqDcrom7CPqnP",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 1.882,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPaey8UzWUejuZ26FLw",
+    "previous_item_id": "item_EkmPZBvkz3Bs8k155WAM9",
+    "item": {
+     "id": "item_EkmPZ3d4sqDcrom7CPqnP",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 1.882,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EkmPaAaqbzgKQc2eq3ck9",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 1.886,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaU7TJ73NKyJmXFtQj",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "Under",
+    "obfuscation": "jdnrOVGga3n"
+   }
+  },
+  {
+   "t": 1.888,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa6LLOJWEQKS3foVXX",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "stood",
+    "obfuscation": "snYNHL1PyHq"
+   }
+  },
+  {
+   "t": 1.897,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaTK0URTKFoRFSIWzb",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ":",
+    "obfuscation": "wTTp8rICtveZwuh"
+   }
+  },
+  {
+   "t": 1.905,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa6bE3BaLxvlHx1690",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Fact",
+    "obfuscation": "pLYohF2dcLY"
+   }
+  },
+  {
+   "t": 1.913,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaEKiU7aTSswPdIjLQ",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " ",
+    "obfuscation": "e22e3gXU5jetDrM"
+   }
+  },
+  {
+   "t": 1.923,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPalebPShNivpFjCDGt",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "3",
+    "obfuscation": "K95NfnNYjNPrNvN"
+   }
+  },
+  {
+   "t": 1.927,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPayesVESxhr8jXwN1k",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " has",
+    "obfuscation": "eegXx7Wj5gSS"
+   }
+  },
+  {
+   "t": 1.935,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPanXA84b7M6lrZTlSc",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " code",
+    "obfuscation": "mODDWejc0Vo"
+   }
+  },
+  {
+   "t": 1.941,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaNuFk5XQ00dIbcbt8",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " word",
+    "obfuscation": "U7mjoBiLdR8"
+   }
+  },
+  {
+   "t": 1.949,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaSG8hX7uuRo8RVgWY",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " W",
+    "obfuscation": "YV1ASALhZ05vru"
+   }
+  },
+  {
+   "t": 1.973,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa2I4y6bRTsBncIHdn",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "3",
+    "obfuscation": "KmNhGLrMT00yNBz"
+   }
+  },
+  {
+   "t": 1.988,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPavIGFlnPjXb0wZIOS",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "X",
+    "obfuscation": "XT2uv1NOjM7y825"
+   }
+  },
+  {
+   "t": 1.992,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa3VkIVbPlGgCpBqrm",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "Yk8JBpBuRWDtxbu"
+   }
+  },
+  {
+   "t": 1.994,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPah8rwXYlDv5bHk78u",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " and",
+    "obfuscation": "0Cg0o3OE6zxE"
+   }
+  },
+  {
+   "t": 1.998,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaT1RtlomCFaXUqotG",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " the",
+    "obfuscation": "EylVTF0i8jtd"
+   }
+  },
+  {
+   "t": 2.046,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPafDoGSl5hKmCPb6Eh",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " quick",
+    "obfuscation": "5BZuWSHbND"
+   }
+  },
+  {
+   "t": 2.063,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa35PXzOwfNsjBybp7",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " brown",
+    "obfuscation": "QI8PCUQPGr"
+   }
+  },
+  {
+   "t": 2.079,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaqzGZZSdpioBVG0kV",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " fox",
+    "obfuscation": "7ecxToCCdQBM"
+   }
+  },
+  {
+   "t": 2.079,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaVT9QvzbjktsqSe5j",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " jumps",
+    "obfuscation": "av5qYvyv1V"
+   }
+  },
+  {
+   "t": 2.083,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EkmPaDdKvswwe6GNOahcJ",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "Understood: Fact 3 has code word W3X, and the quick brown fox jumps"
+   }
+  },
+  {
+   "t": 2.087,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EkmParfz75Go5PqeMPnTe",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "Understood: Fact 3 has code word W3X, and the quick brown fox jumps"
+    }
+   }
+  },
+  {
+   "t": 2.087,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPaRoby8Ml0j6kpVZ99",
+    "previous_item_id": "item_EkmPZBvkz3Bs8k155WAM9",
+    "item": {
+     "id": "item_EkmPZ3d4sqDcrom7CPqnP",
+     "type": "message",
+     "status": "incomplete",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Understood: Fact 3 has code word W3X, and the quick brown fox jumps"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.087,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EkmPas8BzY9zH1RAtlyoI",
+    "response_id": "resp_EkmPZNuKO8YXIziQorMTi",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPZ3d4sqDcrom7CPqnP",
+     "type": "message",
+     "status": "incomplete",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Understood: Fact 3 has code word W3X, and the quick brown fox jumps"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.087,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EkmPaUIS6zVYULajS52Ak",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPZNuKO8YXIziQorMTi",
+     "status": "incomplete",
+     "status_details": {
+      "type": "incomplete",
+      "reason": "max_output_tokens"
+     },
+     "output": [
+      {
+       "id": "item_EkmPZ3d4sqDcrom7CPqnP",
+       "type": "message",
+       "status": "incomplete",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "Understood: Fact 3 has code word W3X, and the quick brown fox jumps"
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EkmPYPz7wBjHtZPTOk22c",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": 20,
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 176,
+      "input_tokens": 156,
+      "output_tokens": 20,
+      "input_token_details": {
+       "text_tokens": 156,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 20,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 2.087,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 4: the code word number 4 is W4X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.087,
+   "sent": {
+    "type": "conversation.item.create",
+    "item": {
+     "type": "message",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 5: the code word number 5 is W5X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.087,
+   "sent": {
+    "type": "response.create"
+   }
+  },
+  {
+   "t": 2.096,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EkmPa5K4CrX1wyhgvJTXG",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199717,
+      "reset_seconds": 0.084
+     }
+    ]
+   }
+  },
+  {
+   "t": 2.228,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPafKOxWRKzpN3vTDhF",
+    "previous_item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "item": {
+     "id": "item_EkmPaEETXSIimNhjXRgLN",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 4: the code word number 4 is W4X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.229,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPalkFkst1PeqpWe8cl",
+    "previous_item_id": "item_EkmPZ3d4sqDcrom7CPqnP",
+    "item": {
+     "id": "item_EkmPaEETXSIimNhjXRgLN",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 4: the code word number 4 is W4X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.238,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPazL4nD3icAe0fjaeZ",
+    "previous_item_id": "item_EkmPaEETXSIimNhjXRgLN",
+    "item": {
+     "id": "item_EkmPaYqM8Ba3pJo02b8sD",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 5: the code word number 5 is W5X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.238,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPa44BLTmWznLZ1vxFA",
+    "previous_item_id": "item_EkmPaEETXSIimNhjXRgLN",
+    "item": {
+     "id": "item_EkmPaYqM8Ba3pJo02b8sD",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 5: the code word number 5 is W5X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.246,
+   "event": {
+    "type": "response.created",
+    "event_id": "event_EkmPaY0lKVFTgp7q7CwZE",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPacXaEWzpi7gWVA2dg",
+     "status": "in_progress",
+     "status_details": null,
+     "output": [],
+     "conversation_id": "conv_EkmPYPz7wBjHtZPTOk22c",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": 20,
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": null,
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 2.389,
+   "event": {
+    "type": "response.output_item.added",
+    "event_id": "event_EkmPae8J0tkejbOc9SnJr",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPaWtNgf1GlYqtAo93n",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 2.389,
+   "event": {
+    "type": "conversation.item.added",
+    "event_id": "event_EkmPaVq38tNJehJr6H1hi",
+    "previous_item_id": "item_EkmPaYqM8Ba3pJo02b8sD",
+    "item": {
+     "id": "item_EkmPaWtNgf1GlYqtAo93n",
+     "type": "message",
+     "status": "in_progress",
+     "role": "assistant",
+     "content": []
+    }
+   }
+  },
+  {
+   "t": 2.39,
+   "event": {
+    "type": "response.content_part.added",
+    "event_id": "event_EkmPaNrYVNFOdFu8TR525",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "t": 2.391,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaYxIif9DD24MjMMiS",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "Under",
+    "obfuscation": "FupzrEXzNpG"
+   }
+  },
+  {
+   "t": 2.399,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPazsagxJMPoZPxg14O",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "stood",
+    "obfuscation": "iAar7tNaudE"
+   }
+  },
+  {
+   "t": 2.406,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPamuNWVVVUxcSVu0XQ",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ":",
+    "obfuscation": "ls2mKyyxWxR4I9o"
+   }
+  },
+  {
+   "t": 2.409,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa0i7sQxEfFFUn22kH",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " Fact",
+    "obfuscation": "FQPzSPKfttL"
+   }
+  },
+  {
+   "t": 2.417,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa19MytiTM0rwLcYyq",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " ",
+    "obfuscation": "acWYWGm7NelMaK5"
+   }
+  },
+  {
+   "t": 2.424,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPajQYucGEGA6fPWlBM",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "5",
+    "obfuscation": "hMi251TX0W8mzr1"
+   }
+  },
+  {
+   "t": 2.432,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaoZ9TXo1QxQeZe0PE",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " has",
+    "obfuscation": "2ghUwfx8OiMP"
+   }
+  },
+  {
+   "t": 2.439,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaS0PXUe5AjwJiMqWZ",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " code",
+    "obfuscation": "FOghOImOCUu"
+   }
+  },
+  {
+   "t": 2.446,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaa3ttHriefzlVyNg3",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " word",
+    "obfuscation": "7EosRYkCFQ7"
+   }
+  },
+  {
+   "t": 2.454,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaBDAHqJISQ1AhKFUQ",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " W",
+    "obfuscation": "Kh1jrjMoX0NEMh"
+   }
+  },
+  {
+   "t": 2.462,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPayhp9Fmgz0ibyOh1B",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "5",
+    "obfuscation": "yDfUXSCNvxYt6yr"
+   }
+  },
+  {
+   "t": 2.47,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa2PY3H1BTP1J445Eb",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": "X",
+    "obfuscation": "MZD85K0IZPpIRTx"
+   }
+  },
+  {
+   "t": 2.477,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaNrQ5oBNM1pK1QmIo",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": ",",
+    "obfuscation": "7HX7pH57onIVdx2"
+   }
+  },
+  {
+   "t": 2.487,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPawve5kRNFGcilCqmk",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " and",
+    "obfuscation": "vFouPbtmccrK"
+   }
+  },
+  {
+   "t": 2.492,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaQyM8sLHkDxGjKXfh",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " the",
+    "obfuscation": "4ZcHZ2s8dS7x"
+   }
+  },
+  {
+   "t": 2.511,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPabv3eGGPvv1LUCBfH",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " quick",
+    "obfuscation": "xo8rHkjRrI"
+   }
+  },
+  {
+   "t": 2.521,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPa6hk1KKfcrHAtn450",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " brown",
+    "obfuscation": "yBAwD4yLNW"
+   }
+  },
+  {
+   "t": 2.529,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPatsIYEJ3QGCyqbPXu",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " fox",
+    "obfuscation": "OgiYMHPgFg4T"
+   }
+  },
+  {
+   "t": 2.531,
+   "event": {
+    "type": "response.output_text.delta",
+    "event_id": "event_EkmPaumvONP5tFylEuUBc",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "delta": " jumps",
+    "obfuscation": "5kmDVeIOoG"
+   }
+  },
+  {
+   "t": 2.541,
+   "event": {
+    "type": "response.output_text.done",
+    "event_id": "event_EkmPaGuoWBfLUkj7MrNW0",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "text": "Understood: Fact 5 has code word W5X, and the quick brown fox jumps"
+   }
+  },
+  {
+   "t": 2.542,
+   "event": {
+    "type": "response.content_part.done",
+    "event_id": "event_EkmPaBlMwAnVJHlZnIUGr",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "item_id": "item_EkmPaWtNgf1GlYqtAo93n",
+    "output_index": 0,
+    "content_index": 0,
+    "part": {
+     "type": "text",
+     "text": "Understood: Fact 5 has code word W5X, and the quick brown fox jumps"
+    }
+   }
+  },
+  {
+   "t": 2.543,
+   "event": {
+    "type": "conversation.item.done",
+    "event_id": "event_EkmPaSVvSNm57ZrY1HkHl",
+    "previous_item_id": "item_EkmPaYqM8Ba3pJo02b8sD",
+    "item": {
+     "id": "item_EkmPaWtNgf1GlYqtAo93n",
+     "type": "message",
+     "status": "incomplete",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Understood: Fact 5 has code word W5X, and the quick brown fox jumps"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.545,
+   "event": {
+    "type": "response.output_item.done",
+    "event_id": "event_EkmPaqKRaemrlOkj2X3PH",
+    "response_id": "resp_EkmPacXaEWzpi7gWVA2dg",
+    "output_index": 0,
+    "item": {
+     "id": "item_EkmPaWtNgf1GlYqtAo93n",
+     "type": "message",
+     "status": "incomplete",
+     "role": "assistant",
+     "content": [
+      {
+       "type": "output_text",
+       "text": "Understood: Fact 5 has code word W5X, and the quick brown fox jumps"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2.547,
+   "event": {
+    "type": "response.done",
+    "event_id": "event_EkmPaEdRdXIwXM6KJCiD1",
+    "response": {
+     "object": "realtime.response",
+     "id": "resp_EkmPacXaEWzpi7gWVA2dg",
+     "status": "incomplete",
+     "status_details": {
+      "type": "incomplete",
+      "reason": "max_output_tokens"
+     },
+     "output": [
+      {
+       "id": "item_EkmPaWtNgf1GlYqtAo93n",
+       "type": "message",
+       "status": "incomplete",
+       "role": "assistant",
+       "content": [
+        {
+         "type": "output_text",
+         "text": "Understood: Fact 5 has code word W5X, and the quick brown fox jumps"
+        }
+       ]
+      }
+     ],
+     "conversation_id": "conv_EkmPYPz7wBjHtZPTOk22c",
+     "output_modalities": [
+      "text"
+     ],
+     "max_output_tokens": 20,
+     "audio": {
+      "output": {
+       "format": {
+        "type": "audio/pcm",
+        "rate": 24000
+       },
+       "voice": "alloy"
+      }
+     },
+     "usage": {
+      "total_tokens": 406,
+      "input_tokens": 386,
+      "output_tokens": 20,
+      "input_token_details": {
+       "text_tokens": 386,
+       "audio_tokens": 0,
+       "image_tokens": 0,
+       "cached_tokens": 0,
+       "cached_tokens_details": {
+        "text_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0
+       }
+      },
+      "output_token_details": {
+       "text_tokens": 20,
+       "audio_tokens": 0
+      }
+     },
+     "metadata": null
+    }
+   }
+  },
+  {
+   "t": 2.547,
+   "sent": {
+    "type": "conversation.item.retrieve",
+    "item_id": "item_EkmPZPpuKlUi6IIF63lDb"
+   }
+  },
+  {
+   "t": 2.558,
+   "event": {
+    "type": "rate_limits.updated",
+    "event_id": "event_EkmPaIqXfxi2xAHcJGRxX",
+    "rate_limits": [
+     {
+      "name": "tokens",
+      "limit": 200000,
+      "remaining": 199717,
+      "reset_seconds": 0.084
+     }
+    ]
+   }
+  },
+  {
+   "t": 2.686,
+   "event": {
+    "type": "conversation.item.retrieved",
+    "event_id": "event_EkmPaIsqNDlHQ1a5qbAWq",
+    "item": {
+     "id": "item_EkmPZPpuKlUi6IIF63lDb",
+     "type": "message",
+     "status": "completed",
+     "role": "user",
+     "content": [
+      {
+       "type": "input_text",
+       "text": "Fact 0: the code word number 0 is W0X. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. The quick brown fox jumps over the lazy dog near the old stone bridge. "
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

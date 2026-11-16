@@ -39,6 +39,9 @@ def user_text(text):
         "type": "message", "role": "user", "content": [{"type": "input_text", "text": text}]}}}
 
 
+FILLER = "The quick brown fox jumps over the lazy dog near the old stone bridge. " * 6
+
+
 def system_text(text):
     return {"do": "send", "event": {"type": "conversation.item.create", "item": {
         "type": "message", "role": "system", "content": [{"type": "input_text", "text": text}]}}}
@@ -343,6 +346,52 @@ SCENARIOS = [
                       "type": "function_call_output", "call_id": "call_unknown", "output": "{}"}}},
                   {"do": "wait", "for": "error"},
                   {"do": "send", "event": {"type": "no.such.event"}},
+                  {"do": "wait", "for": "error"}],
+    },
+    {
+        # no session.update: a new session detects the turn and answers it with speech
+        "name": "default_session",
+        "phase": "P6",
+        "steps": [{"do": "audio", "file": "q_capital.wav", "silence_before_ms": 500, "silence_after_ms": 1500, "realtime": True},
+                  {"do": "wait", "for": "response.done", "timeout": 30}],
+    },
+    {
+        # the conversation grows past a small token limit: old items leave the context, the client keeps them
+        "name": "truncation",
+        "phase": "P6",
+        "steps": [no_vad(output_modalities=["text"], max_output_tokens=20, truncation={
+                      "type": "retention_ratio", "retention_ratio": 0.5, "token_limits": {"post_instructions": 400}}), WAIT_UPDATED]
+                 + [step for i in range(3) for step in (
+                      user_text(f"Fact {2 * i}: the code word number {2 * i} is W{2 * i}X. " + FILLER),
+                      user_text(f"Fact {2 * i + 1}: the code word number {2 * i + 1} is W{2 * i + 1}X. " + FILLER),
+                      CREATE, WAIT_DONE)]
+                 + [{"do": "send", "event": {"type": "conversation.item.retrieve", "item_id": "$item[0]"}},
+                    {"do": "wait", "for": "conversation.item.retrieved"}],
+    },
+    {
+        # the result of a tool call comes after another user message
+        "name": "tool_output_late",
+        "phase": "P6",
+        "steps": [no_vad(output_modalities=["text"], tools=[WEATHER_TOOL], tool_choice="auto"), WAIT_UPDATED,
+                  user_text("What's the weather in Berlin right now?"), CREATE, WAIT_DONE,
+                  user_text("Please answer in one short sentence."), {"do": "wait", "for": "conversation.item.done"},
+                  {"do": "tool_output", "output": "{\"temperature_c\": 12, \"condition\": \"light rain\"}"},
+                  {"do": "wait", "for": "conversation.item.done"},
+                  CREATE, WAIT_DONE],
+    },
+    {
+        # a field the API does not have: in the event, the session, an item and a response
+        "name": "unknown_parameter",
+        "phase": "P6",
+        "steps": [no_vad(output_modalities=["text"]), WAIT_UPDATED,
+                  {"do": "send", "event": {"type": "input_audio_buffer.clear", "foo": 1}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "session.update", "session": {"type": "realtime", "audio": {"input": {"foo": 1}}}}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "conversation.item.create", "item": {
+                      "type": "message", "role": "user", "content": [{"type": "input_text", "text": "Hello.", "foo": 1}]}}},
+                  {"do": "wait", "for": "error"},
+                  {"do": "send", "event": {"type": "response.create", "response": {"foo": 1}}},
                   {"do": "wait", "for": "error"}],
     },
 ]
