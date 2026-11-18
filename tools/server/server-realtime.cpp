@@ -441,6 +441,7 @@ struct realtime_conversation {
     std::unique_ptr<server_turn_detector> detector;        // owned by the reader thread
     std::string                           speech_item_id;  // the user item of the speech in progress
     std::atomic<bool>                     responding{false};
+    std::atomic<bool>                     hot{false}; // a response is in progress, see set_hot()
     std::atomic<bool>                     cancel_sent{false};   // the response in progress was cancelled, it ends soon
     std::atomic<bool>                     cancel_by_turn{false}; // by the start of speech (turn detection)
     std::atomic<bool>                     response_ended{false}; // for the idle timeout of the detector
@@ -463,6 +464,7 @@ struct realtime_conversation {
     std::string tool_header;  // around a tool result
     std::string tool_footer;
     bool        has_tool_text = false; // the chat template renders tool results
+    std::string assistant_open;        // a first user turn and the generation prompt, as render_assistant() renders them
 
     // around a system message in the conversation, by what goes before it; next: before what follows it
     struct system_text {
@@ -476,6 +478,17 @@ struct realtime_conversation {
         bool        ok_first = false;
         bool        ok_tool  = false;
     } sys_text;
+
+    // the turn text of the contexts the session had, by context_key(): to derive it the chat template renders many times
+    struct turn_text {
+        std::string first_header, user_header, user_footer, assistant_header, assistant_footer, tool_header, tool_footer;
+        std::string assistant_open;
+        bool        has_tool_text;
+        system_text sys;
+        bool        ok;
+    };
+    static constexpr size_t          max_turn_texts = 16;
+    std::map<std::string, turn_text> turn_texts;
 
     // conversation state, owned by the reader thread
     bool        started   = false; // something went into the slot, the session type is fixed
@@ -556,6 +569,11 @@ struct realtime_conversation {
         std::vector<server_turn_action> actions; // or the turn detection of audio that came in meanwhile
     };
     std::deque<held_event>           held_events;
+
+    // the items from here on are not in the slot (SIZE_MAX: all are): a delete takes its item out of the conversation
+    // at once, the items after it go in again when the slot is needed, once for a run of deletes
+    size_t stale_from  = SIZE_MAX;
+    bool   last_append = false; // the last client event was audio
 
     // prompt cache of the contexts: a response with its own context starts from the snapshot of an earlier context
     // with the same instructions and tools whose items begin the conversation, and only its newer items go in; the
@@ -883,7 +901,7 @@ struct realtime_conversation {
         msg.content    = content;
         msg.tool_calls = calls;
         try {
-            const std::string g = render_with_instructions({user}, true);
+            const std::string g = assistant_open.empty() ? render_with_instructions({user}, true) : assistant_open;
             const std::string c = render_with_instructions({user, msg}, false);
             if (c.compare(0, g.size(), g) == 0) {
                 std::string body = c.substr(g.size());
@@ -941,6 +959,7 @@ struct realtime_conversation {
         first_header     = a.substr(0, pa);
         user_footer      = a.substr(pa + user.size());
         assistant_header = g.substr(a.size());
+        assistant_open   = g;
         assistant_footer = c.substr(pc + reply.size());
         user_header      = d.substr(c.size(), pd - c.size());
 
@@ -1031,6 +1050,25 @@ struct realtime_conversation {
         }
         tools = session_tools;
         return has_tool_text || session_tools.empty();
+    }
+
+    turn_text save_turn_text(bool ok) const {
+        return {first_header, user_header, user_footer, assistant_header, assistant_footer, tool_header, tool_footer,
+                assistant_open, has_tool_text, sys_text, ok};
+    }
+
+    bool load_turn_text(const turn_text & t) {
+        first_header     = t.first_header;
+        user_header      = t.user_header;
+        user_footer      = t.user_footer;
+        assistant_header = t.assistant_header;
+        assistant_footer = t.assistant_footer;
+        tool_header      = t.tool_header;
+        tool_footer      = t.tool_footer;
+        assistant_open   = t.assistant_open;
+        has_tool_text    = t.has_tool_text;
+        sys_text         = t.sys;
+        return t.ok;
     }
 
     //
@@ -1140,10 +1178,8 @@ struct realtime_conversation {
                     }
                     return ensure_turn() && control(SERVER_CONTROL_ACTION_TEXT_APPEND, it.transcript);
                 }
-                if (!ensure_turn() || (!it.pcm.empty() && !control(SERVER_CONTROL_ACTION_AUDIO_APPEND, {}, it.pcm))) {
-                    return false;
-                }
-                return control(SERVER_CONTROL_ACTION_AUDIO_END);
+                // the whole audio with its end: the slot has the encoded audio of the last turns
+                return ensure_turn() && control(SERVER_CONTROL_ACTION_AUDIO_END, {}, it.pcm);
             case conv_item::TOOL_OUTPUT:
                 if (!control(SERVER_CONTROL_ACTION_TEXT_APPEND, next_header + tool_header + it.text + tool_footer)) {
                     return false;
@@ -1241,7 +1277,7 @@ struct realtime_conversation {
         if (audio_open) {
             return true;
         }
-        if (!begin_item() || !ensure_turn()) {
+        if (!put_stale() || !begin_item() || !ensure_turn()) {
             return false;
         }
         audio_open = true;
@@ -1665,6 +1701,56 @@ struct realtime_conversation {
         send_event({{"type", "conversation.item.done"},  {"previous_item_id", prev}, {"item", item}});
     }
 
+    // takes the items from k on out of the slot, they stay in the conversation until put_stale()
+    bool unput_from(size_t k) {
+        std::string mark;
+        turn_state  before;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            // a response goes back as a whole, from its first item
+            while (k > 0 && k < items.size() && items[k].mark.empty()) {
+                k--;
+            }
+            if (k >= stale_from || k >= items.size()) {
+                return true;
+            }
+            mark   = items[k].mark;
+            before = items[k].before;
+        }
+        drop_snapshots(k);
+        if (!control(SERVER_CONTROL_ACTION_ROLLBACK, mark)) {
+            send_error("failed to go back in the conversation", "server_error");
+            return false;
+        }
+        load_turn(before);
+        stale_from = k;
+        return true;
+    }
+
+    // the items that left the slot (unput_from) go in again
+    bool put_stale() {
+        if (stale_from == SIZE_MAX) {
+            return true;
+        }
+        std::vector<conv_item> tail;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            const size_t k = std::min(stale_from, items.size());
+            tail.assign(std::make_move_iterator(items.begin() + k), std::make_move_iterator(items.end()));
+            items.erase(items.begin() + k, items.end());
+            last_item_id = last_id();
+        }
+        stale_from = SIZE_MAX;
+        // the transcriptions on other slots wait, as for a response
+        const bool was_hot = hot;
+        set_hot(true);
+        const bool ok = put_items(tail, true);
+        if (!was_hot) {
+            set_hot(false);
+        }
+        return ok;
+    }
+
     // goes back to item k and puts items k.. in again, after `change` edited them
     bool rebuild(size_t k, const std::function<void(std::vector<conv_item> &)> & change) {
         std::vector<conv_item> tail;
@@ -1801,30 +1887,27 @@ struct realtime_conversation {
         }
     }
 
-    // after a response with its own context: the session context from its snapshot, then the items that came since
+    // after a response with its own context: the session context from its snapshot, the items that came since go in
+    // when the slot is needed (put_stale)
     bool restore_from_snapshot() {
         keep_own_context();
         const ctx_snapshot s = std::move(session_snap);
         session_snap = {};
-        std::vector<conv_item> tail;
+        size_t n_items;
         {
             std::lock_guard<std::mutex> lock(mutex);
             if (!starts_with(ids_of(items), s.ids)) {
                 control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, s.name);
                 return false;
             }
-            tail.assign(std::make_move_iterator(items.begin() + s.ids.size()), std::make_move_iterator(items.end()));
-            items.erase(items.begin() + s.ids.size(), items.end());
-            last_item_id = last_id();
+            n_items = items.size();
         }
         if (!control(SERVER_CONTROL_ACTION_SNAPSHOT_LOAD, s.name)) {
-            std::lock_guard<std::mutex> lock(mutex);
-            items.insert(items.end(), std::make_move_iterator(tail.begin()), std::make_move_iterator(tail.end()));
             return false;
         }
         control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, s.name);
         load_turn(s.turn);
-        put_items(tail, true);
+        stale_from = s.ids.size() < n_items ? s.ids.size() : SIZE_MAX;
         return true;
     }
 
@@ -1872,6 +1955,7 @@ struct realtime_conversation {
     void put_conversation() {
         control(SERVER_CONTROL_ACTION_CLEAR);
         load_turn({});
+        stale_from = SIZE_MAX;
         std::vector<conv_item> all = take_items();
         put_items(all, true);
     }
@@ -1919,6 +2003,16 @@ struct realtime_conversation {
             return;
         }
         if (!can_edit("conversation.item.delete", true)) {
+            return;
+        }
+        if (!audio_open) {
+            if (!unput_from(i)) {
+                return;
+            }
+            std::lock_guard<std::mutex> lock(mutex);
+            items.erase(std::remove_if(items.begin(), items.end(), [&](const conv_item & it) { return it.id == id; }), items.end());
+            last_item_id = last_id();
+            send_event({{"type", "conversation.item.deleted"}, {"item_id", id}});
             return;
         }
         const bool ok = edit_around_audio([&]() { return rebuild(i, [&](std::vector<conv_item> & tail) {
@@ -2142,6 +2236,10 @@ struct realtime_conversation {
                 }
             }
         }
+        // a tool output at the end joins the items that are not in the slot, see on_tool_output()
+        if (it.kind != conv_item::TOOL_OUTPUT && !put_stale()) {
+            return;
+        }
         // previous_item_id: insert after that item ("root": before the first one), the items after it go in again
         if (ev.contains("previous_item_id") && ev["previous_item_id"].is_string() && ev["previous_item_id"] != last_item_id) {
             const std::string prev = ev["previous_item_id"];
@@ -2280,7 +2378,11 @@ struct realtime_conversation {
             }
         }
         if (!last) {
-            return insert_item(std::move(it), prev);
+            return put_stale() && insert_item(std::move(it), prev);
+        }
+        if (stale_from != SIZE_MAX) {
+            add_item(std::move(it)); // the slot gets it with the other items it lacks
+            return true;
         }
         if (turn_open) {
             send_error("conversation.item.create: a function call output cannot go into an open user turn");
@@ -2301,17 +2403,9 @@ struct realtime_conversation {
             return false;
         }
         std::vector<conv_item> ctx_items;
-        turn_state             start = save_turn();
-        std::string            first_mark;
-        {
+        if (!has_input) {
             std::lock_guard<std::mutex> lock(mutex);
-            if (!items.empty()) {
-                start      = items[0].before;
-                first_mark = items[0].mark;
-            }
-            if (!has_input) {
-                ctx_items = items;
-            }
+            ctx_items = items;
         }
         if (has_input) {
             for (size_t n = 0; n < resp["input"].size(); n++) {
@@ -2358,19 +2452,21 @@ struct realtime_conversation {
             return false;
         }
         if (!has_input) {
-            return put_cached_context(ctx_items, start, first_mark);
+            return put_cached_context(ctx_items);
         }
-        if (!first_mark.empty() && !control(SERVER_CONTROL_ACTION_ROLLBACK, first_mark)) {
+        // the own context starts with its own instructions and tools: nothing of the conversation stays in the slot
+        // (the mark of the first item is after the session prompt if the conversation starts with a response)
+        if (!control(SERVER_CONTROL_ACTION_ROLLBACK)) {
             send_error("failed to go back in the conversation", "server_error");
             return false;
         }
         restore_mark   = "base" + std::to_string(n_marks++);
-        restore_before = start;
+        restore_before = {};
         if (!control(SERVER_CONTROL_ACTION_MARK, restore_mark)) {
             return false;
         }
         pending_restore = true;
-        load_turn(start);
+        load_turn({});
         if (!put_items(ctx_items, false)) {
             return false;
         }
@@ -2380,11 +2476,13 @@ struct realtime_conversation {
 
     // the own context of a response over the conversation (no input of its own): the session context goes into a
     // snapshot, the own context starts from the snapshot of the same context that holds the most items, if any
-    bool put_cached_context(std::vector<conv_item> & ctx_items, const turn_state & start, const std::string & first_mark) {
+    bool put_cached_context(std::vector<conv_item> & ctx_items) {
+        // the session context may lack the last items (stale_from): they go in when it is back
+        const std::vector<std::string> ids = ids_of(ctx_items);
         own_ctx           = {};
         session_snap      = {};
         session_snap.name = "session";
-        session_snap.ids  = ids_of(ctx_items);
+        session_snap.ids.assign(ids.begin(), ids.begin() + std::min(stale_from, ids.size()));
         session_snap.turn = save_turn();
         if (!control(SERVER_CONTROL_ACTION_SNAPSHOT_SAVE, session_snap.name)) {
             return false;
@@ -2394,7 +2492,7 @@ struct realtime_conversation {
 
         const std::string key = context_key();
         size_t from = 0;
-        if (ctx_snapshot * hit = find_snapshot(key, session_snap.ids)) {
+        if (ctx_snapshot * hit = find_snapshot(key, ids)) {
             if (!control(SERVER_CONTROL_ACTION_SNAPSHOT_LOAD, hit->name)) {
                 return false;
             }
@@ -2402,18 +2500,18 @@ struct realtime_conversation {
             load_turn(hit->turn);
             from = hit->ids.size();
         } else {
-            if (!first_mark.empty() && !control(SERVER_CONTROL_ACTION_ROLLBACK, first_mark)) {
+            if (!control(SERVER_CONTROL_ACTION_ROLLBACK)) {
                 send_error("failed to go back in the conversation", "server_error");
                 return false;
             }
-            load_turn(start);
+            load_turn({});
         }
         std::vector<conv_item> rest(std::make_move_iterator(ctx_items.begin() + from), std::make_move_iterator(ctx_items.end()));
         if (!put_items(rest, false)) {
             return false;
         }
         own_ctx.key  = key;
-        own_ctx.ids  = session_snap.ids;
+        own_ctx.ids  = ids;
         own_ctx.turn = save_turn();
         own_end_mark = "own" + std::to_string(n_marks++);
         if (!control(SERVER_CONTROL_ACTION_MARK, own_end_mark)) {
@@ -2423,10 +2521,33 @@ struct realtime_conversation {
         return turn_open || tool_results || system_last || ensure_turn();
     }
 
+    // from the start of a response to its end (with its speech) the transcriptions on other slots wait, they share the GPU
+    void set_hot(bool on) {
+        if (hot.exchange(on) == on) {
+            return;
+        }
+        deps.n_hot += on ? 1 : -1;
+        if (!on) {
+            // the slots that waited have work again
+            server_task task(SERVER_TASK_TYPE_NEXT_RESPONSE);
+            task.id = deps.queue_tasks.get_new_id();
+            deps.queue_tasks.post(std::move(task));
+        }
+    }
+
     // from_client: the client asked for it, else the turn detection
     // again: the response in progress starts again after a slot error (recover), the client has its response.created
     // false: no response runs
     bool on_response_create(const json & ev, bool from_client = true, bool again = false) {
+        set_hot(true);
+        const bool ok = create_response(ev, from_client, again);
+        if (!ok && !responding) {
+            set_hot(false);
+        }
+        return ok;
+    }
+
+    bool create_response(const json & ev, bool from_client, bool again) {
         if (type == "transcription") {
             send_error("response.create: not supported in a transcription session");
             return false;
@@ -2523,6 +2644,10 @@ struct realtime_conversation {
             reset_context();
             put_conversation();
             reopen_audio(std::move(held));
+        }
+        // a response with its own context over the conversation takes the items as they are, see put_cached_context()
+        if ((!fresh || has_input) && !put_stale()) {
+            return false;
         }
         if (fresh && !put_response_context(resp, has_input, resp_instructions, resp_tools, resp_tools_json)) {
             return false;
@@ -2850,7 +2975,20 @@ struct realtime_conversation {
                 instructions = instructions.empty() ? speech : speech + "\n" + instructions;
             }
         }
-        const bool ok = derive_turn_text();
+        const std::string key = context_key();
+        bool ok;
+        if (auto it = turn_texts.find(key); it != turn_texts.end()) {
+            ok = load_turn_text(it->second);
+        } else {
+            ok = derive_turn_text();
+            if (instructions != saved) {
+                assistant_open.clear(); // render_assistant() renders with the instructions of the session
+            }
+            if (turn_texts.size() >= max_turn_texts) {
+                turn_texts.clear();
+            }
+            turn_texts[key] = save_turn_text(ok);
+        }
         instructions = saved;
         return ok;
     }
@@ -2874,10 +3012,21 @@ struct realtime_conversation {
                 return;
             }
             if (!responding) {
+                set_hot(true);
                 restore_conversation();
                 run_held();
+                if (!responding) {
+                    set_hot(false);
+                }
             }
         }
+        // the items that left the slot go in again when it is needed, or with the audio after other events (idle time);
+        // deletes, tool outputs and a response with its own context leave the slot as it is
+        const bool append = t == "input_audio_buffer.append";
+        if (append ? last_append : t != "conversation.item.delete" && t != "response.create" && t != "conversation.item.create") {
+            put_stale();
+        }
+        last_append = append;
         client_event_id = ev.is_object() ? json_value(ev, "event_id", std::string()) : std::string();
         dispatch(t, ev);
         client_event_id.clear();
@@ -3210,6 +3359,7 @@ struct realtime_conversation {
 
     // the end of a response: done events, the items of the conversation, response.done (mutex held)
     void finish_response(const server_task_result_realtime & res_in) {
+        set_hot(false);
         server_task_result_realtime res = res_in;
         res.n_out_audio += voice_frames;
         if (voice_resp && voice_cancel && voice_cancel->load()) {
@@ -3610,6 +3760,7 @@ struct realtime_conversation {
         closed = true;
         conn.close();
         reader.join();
+        set_hot(false);
         if (asr_turn) {
             deps.asr->cancel(asr_turn); // its sequence of the ASR model is free again
             asr_turn.reset();
@@ -3643,9 +3794,11 @@ void server_realtime_conversation(const server_realtime_deps & deps, server_http
 //
 
 server_realtime_slot::server_realtime_slot(llama_context * ctx, mtmd_context * mctx, llama_seq_id seq_id, int32_t n_ctx,
-                                           const common_params_sampling & sampling, server_response & queue_results, int id_task, int index)
+                                           const common_params_sampling & sampling, server_response & queue_results, int id_task, int index,
+                                           bool swa_full, server_realtime_prompts & prompts)
     : ctx(ctx), model(llama_get_model(ctx)), vocab(llama_model_get_vocab(llama_get_model(ctx))), mctx(mctx), seq_id(seq_id),
-      n_ctx(n_ctx), sampling(sampling), queue_results(queue_results), id_task(id_task), index(index) {
+      n_ctx(n_ctx), sampling(sampling), queue_results(queue_results), id_task(id_task), index(index), swa_full(swa_full),
+      prompts(prompts) {
     if (mctx && mtmd_gen_audio_get_info(mctx).type != MTMD_GEN_AUDIO_TYPE_NONE) {
         gen.init(ctx, mctx);
     }
@@ -3693,12 +3846,9 @@ void server_realtime_slot::send_result(common_chat_input content, std::vector<fl
 }
 
 // appends tokens or embedding rows to the conversation, logits of the last one if asked
-bool server_realtime_slot::decode(const llama_token * tokens, const float * rows, int32_t n, bool logits_last) {
+bool server_realtime_slot::eval(const llama_token * tokens, const float * rows, int32_t n, llama_pos p0, bool logits_last) {
     const int32_t n_embd  = llama_model_n_embd_inp(model);
     const int32_t n_batch = llama_n_batch(ctx);
-    if (n_past + n >= n_ctx) {
-        return fail("the conversation does not fit in the context", ERROR_TYPE_EXCEED_CONTEXT_SIZE);
-    }
     for (int32_t i0 = 0; i0 < n; i0 += n_batch) {
         const int32_t n_cur = std::min(n_batch, n - i0);
         llama_batch b = llama_batch_init(n_cur, rows ? n_embd : 0, 1);
@@ -3708,7 +3858,7 @@ bool server_realtime_slot::decode(const llama_token * tokens, const float * rows
             } else {
                 b.token[i] = tokens[i0 + i];
             }
-            b.pos[i]       = n_past + i0 + i;
+            b.pos[i]       = p0 + i0 + i;
             b.n_seq_id[i]  = 1;
             b.seq_id[i][0] = seq_id;
             b.logits[i]    = logits_last && i0 + i == n - 1;
@@ -3720,11 +3870,88 @@ bool server_realtime_slot::decode(const llama_token * tokens, const float * rows
             return fail("failed to decode the conversation");
         }
     }
-    n_past += n;
-    if (rows) {
-        n_audio += n;
+    return true;
+}
+
+// tokens wait for the next decode that needs them in the memory, rows go in at once
+bool server_realtime_slot::decode(const llama_token * tokens, const float * rows, int32_t n, bool logits_last) {
+    if (n_past + n >= n_ctx) {
+        return fail("the conversation does not fit in the context", ERROR_TYPE_EXCEED_CONTEXT_SIZE);
+    }
+    if (tokens) {
+        pending.insert(pending.end(), tokens, tokens + n);
+        n_past += n;
+        return !logits_last || flush(true);
+    }
+    if (!flush() || !eval(nullptr, rows, n, n_past, logits_last)) {
+        return false;
+    }
+    n_past  += n;
+    n_audio += n;
+    return true;
+}
+
+bool server_realtime_slot::flush(bool logits_last) {
+    const llama_tokens toks = std::move(pending);
+    pending.clear();
+    if (toks.empty()) {
+        return true;
+    }
+    const llama_pos p0 = n_past - (llama_pos) toks.size();
+    // the start of a context: a long prompt may be in the memory of an earlier context already
+    // the state is cut to the common part, with a sliding window that needs the full cache (--swa-full)
+    const bool    start  = p0 == 0 && toks.size() >= server_realtime_prompts::min_tokens && (swa_full || llama_model_n_swa(model) == 0);
+    const int32_t n_have = start ? load_prompt(toks) : 0;
+    if (!eval(toks.data() + n_have, nullptr, (int32_t) toks.size() - n_have, p0 + n_have, logits_last)) {
+        return false;
+    }
+    if (start && n_have == 0) {
+        save_prompt(toks);
     }
     return true;
+}
+
+// the positions that the state of an earlier prompt fills, 0 if none starts like toks
+int32_t server_realtime_slot::load_prompt(const llama_tokens & toks) {
+    server_realtime_prompts::entry * best = nullptr;
+    size_t n_best = 0;
+    for (auto & e : prompts.entries) {
+        size_t n = 0;
+        while (n < e.tokens.size() && n < toks.size() && e.tokens[n] == toks[n]) {
+            n++;
+        }
+        if (n > n_best) {
+            best   = &e;
+            n_best = n;
+        }
+    }
+    n_best = std::min(n_best, toks.size() - 1); // the last token is decoded for its logits
+    if (!best || n_best < server_realtime_prompts::min_tokens) {
+        return 0;
+    }
+    llama_memory_t mem = llama_get_memory(ctx);
+    if (llama_state_seq_set_data_ext(ctx, best->state.data(), best->state.size(), seq_id, 0) != best->state.size() ||
+        !llama_memory_seq_rm(mem, seq_id, (llama_pos) n_best, -1)) {
+        llama_memory_seq_rm(mem, seq_id, -1, -1);
+        return 0;
+    }
+    best->used = ++prompts.n_use;
+    return (int32_t) n_best;
+}
+
+void server_realtime_slot::save_prompt(const llama_tokens & toks) {
+    server_realtime_prompts::entry e;
+    e.tokens = toks;
+    e.used   = ++prompts.n_use;
+    e.state.resize(llama_state_seq_get_size_ext(ctx, seq_id, 0));
+    if (llama_state_seq_get_data_ext(ctx, e.state.data(), e.state.size(), seq_id, 0) != e.state.size()) {
+        return;
+    }
+    auto & all = prompts.entries;
+    if (all.size() >= server_realtime_prompts::max_entries) {
+        all.erase(std::min_element(all.begin(), all.end(), [](const auto & a, const auto & b) { return a.used < b.used; }));
+    }
+    all.push_back(std::move(e));
 }
 
 // decodes the rows the audio stream has ready
@@ -3742,7 +3969,62 @@ bool server_realtime_slot::audio_rows() {
         if (!decode(tokens, rows, n, false)) {
             return false;
         }
+        // the chunks of the stream are kept as one part per run of tokens or rows: it goes in again in one decode
+        auto & parts = audio_open.parts;
+        if (parts.empty() || parts.back().tokens.empty() != !tokens) {
+            parts.emplace_back();
+        }
+        if (tokens) {
+            parts.back().tokens.insert(parts.back().tokens.end(), tokens, tokens + n);
+        } else {
+            parts.back().rows.insert(parts.back().rows.end(), rows, rows + (size_t) n * llama_model_n_embd_inp(model));
+        }
     }
+}
+
+// the end of the audio of a turn; pcm: the whole audio of a turn that goes in again (not of the stream)
+bool server_realtime_slot::audio_end(const std::vector<float> & pcm) {
+    if (!streaming) {
+        turn_pcm.insert(turn_pcm.end(), pcm.begin(), pcm.end());
+        return audio_whole();
+    }
+    if (!stream && !pcm.empty()) {
+        for (const auto & turn : audio_turns) {
+            if (turn.pcm != pcm) {
+                continue;
+            }
+            for (const auto & part : turn.parts) {
+                const bool    rows = part.tokens.empty();
+                const int32_t n    = rows ? (int32_t) (part.rows.size() / llama_model_n_embd_inp(model)) : (int32_t) part.tokens.size();
+                if (!decode(rows ? nullptr : part.tokens.data(), rows ? part.rows.data() : nullptr, n, false)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        stream.reset(mtmd_audio_stream_init(mctx, mtmd_audio_stream_params_default()));
+        if (!stream) {
+            return fail("failed to initialize the audio stream");
+        }
+    }
+    if (!stream) {
+        return true;
+    }
+    if (!pcm.empty()) {
+        audio_open.pcm.insert(audio_open.pcm.end(), pcm.begin(), pcm.end());
+        mtmd_audio_stream_push(stream.get(), pcm.data(), pcm.size());
+    }
+    mtmd_audio_stream_flush(stream.get(), true);
+    if (!audio_rows()) {
+        return false;
+    }
+    stream.reset();
+    if (audio_turns.size() >= max_audio_turns) {
+        audio_turns.pop_front();
+    }
+    audio_turns.push_back(std::move(audio_open));
+    audio_open = {};
+    return true;
 }
 
 // encodes the audio of a turn in one go, for models without an audio stream: the media chunks of mtmd carry the
@@ -3771,6 +4053,9 @@ bool server_realtime_slot::audio_whole() {
         if (mtmd_input_chunk_get_type(chunks[i]) == MTMD_INPUT_CHUNK_TYPE_AUDIO) {
             n_rows += (int32_t) mtmd_input_chunk_get_n_tokens(chunks[i]);
         }
+    }
+    if (!flush()) {
+        return false;
     }
     llama_pos new_n_past = n_past;
     if (mtmd_helper_eval_chunks(mctx, ctx, chunks.ptr.get(), n_past, seq_id, llama_n_batch(ctx), false, &new_n_past) != 0) {
@@ -3809,6 +4094,9 @@ bool server_realtime_slot::response_start(const server_realtime_op & op) {
     }
 
     if (gen.valid()) {
+        if (!flush()) {
+            return false;
+        }
         // the gen-audio pipeline continues the conversation and follows the model's text/audio switching
         mtmd_helper::gen_audio::inp inp;
         inp.set_prompt(op.text);
@@ -3941,7 +4229,10 @@ bool server_realtime_slot::set_mark(const std::string & name) {
     m.n_past     = n_past;
     m.n_audio    = n_audio;
     m.n_prev_end = n_prev_end;
-    if (n_past > 0) {
+    if (n_past > 0 && !swa_full) {
+        if (!flush()) {
+            return false;
+        }
         m.state.resize(llama_state_seq_get_size_ext(ctx, seq_id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY));
         if (llama_state_seq_get_data_ext(ctx, m.state.data(), m.state.size(), seq_id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY) != m.state.size()) {
             return fail("failed to save the conversation state");
@@ -3952,14 +4243,24 @@ bool server_realtime_slot::set_mark(const std::string & name) {
 }
 
 bool server_realtime_slot::rollback(const std::string & name) {
-    auto it = std::find_if(marks.begin(), marks.end(), [&](const mark & m) { return m.name == name; });
+    if (name.empty()) {
+        // the start of the conversation: a mark there that always exists
+        marks.insert(marks.begin(), mark());
+    }
+    auto it = name.empty() ? marks.begin() : std::find_if(marks.begin(), marks.end(), [&](const mark & m) { return m.name == name; });
     if (it == marks.end()) {
         return fail("unknown conversation mark " + name);
     }
-    llama_memory_t mem = llama_get_memory(ctx);
-    if (it->n_past == 0) {
+    llama_memory_t  mem   = llama_get_memory(ctx);
+    const llama_pos n_mem = n_past - (llama_pos) pending.size();
+    if (it->n_past >= n_mem) {
+        // the memory is as it was at the mark
+        pending.resize(it->n_past - n_mem);
+    } else if (it->n_past == 0) {
+        pending.clear();
         llama_memory_seq_rm(mem, seq_id, -1, -1);
     } else {
+        pending.clear();
         if (!it->state.empty() &&
             llama_state_seq_set_data_ext(ctx, it->state.data(), it->state.size(), seq_id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY) != it->state.size()) {
             return fail("failed to restore the conversation state");
@@ -3972,12 +4273,16 @@ bool server_realtime_slot::rollback(const std::string & name) {
     n_audio    = it->n_audio;
     n_prev_end = it->n_prev_end;
     stream.reset();
+    audio_open = {};
     turn_pcm.clear();
     marks.erase(it, marks.end());
     return true;
 }
 
 bool server_realtime_slot::save_snapshot(const std::string & name) {
+    if (!flush()) {
+        return false;
+    }
     snapshot s;
     s.n_past     = n_past;
     s.n_audio    = n_audio;
@@ -3999,6 +4304,7 @@ bool server_realtime_slot::load_snapshot(const std::string & name) {
         return fail("unknown conversation snapshot " + name);
     }
     const snapshot & s = it->second;
+    pending.clear();
     llama_memory_seq_rm(llama_get_memory(ctx), seq_id, -1, -1);
     if (!s.state.empty() &&
         llama_state_seq_set_data_ext(ctx, s.state.data(), s.state.size(), seq_id, 0) != s.state.size()) {
@@ -4009,6 +4315,7 @@ bool server_realtime_slot::load_snapshot(const std::string & name) {
     n_prev_end = s.n_prev_end;
     marks      = s.marks;
     stream.reset();
+    audio_open = {};
     turn_pcm.clear();
     return true;
 }
@@ -4072,6 +4379,7 @@ bool server_realtime_slot::run() {
                             return fail("failed to initialize the audio stream");
                         }
                     }
+                    audio_open.pcm.insert(audio_open.pcm.end(), op.audio.begin(), op.audio.end());
                     mtmd_audio_stream_push(stream.get(), op.audio.data(), op.audio.size());
                     if (!audio_rows()) {
                         return false;
@@ -4080,16 +4388,8 @@ bool server_realtime_slot::run() {
             case SERVER_CONTROL_ACTION_AUDIO_COMMIT:
             case SERVER_CONTROL_ACTION_AUDIO_END:
                 {
-                    // the end of the audio of a turn
-                    if (!streaming && !audio_whole()) {
+                    if (!audio_end(op.audio)) {
                         return false;
-                    }
-                    if (stream) {
-                        mtmd_audio_stream_flush(stream.get(), true);
-                        if (!audio_rows()) {
-                            return false;
-                        }
-                        stream.reset();
                     }
                 } break;
             case SERVER_CONTROL_ACTION_RESPONSE_CREATE:
@@ -4102,8 +4402,10 @@ bool server_realtime_slot::run() {
                 {
                     llama_memory_seq_rm(llama_get_memory(ctx), seq_id, -1, -1);
                     stream.reset();
+                    audio_open = {};
                     turn_pcm.clear();
                     marks.clear();
+                    pending.clear();
                     n_past     = 0;
                     n_audio    = 0;
                     n_prev_end = 0;

@@ -57,14 +57,14 @@ enum server_control_action {
     SERVER_CONTROL_ACTION_REASONING_END,
     SERVER_CONTROL_ACTION_AUDIO_APPEND, // push control_audio into the slot's audio stream
     SERVER_CONTROL_ACTION_AUDIO_COMMIT, // flush the audio stream, more audio can follow
-    SERVER_CONTROL_ACTION_AUDIO_END,    // flush the audio stream and end it
+    SERVER_CONTROL_ACTION_AUDIO_END,    // flush the audio stream and end it; with control_audio: the whole audio of a turn
     // realtime conversations (SERVER_TASK_TYPE_REALTIME), applied in order with the audio actions
     SERVER_CONTROL_ACTION_TEXT_APPEND,     // append control_text to the conversation
     SERVER_CONTROL_ACTION_RESPONSE_CREATE, // generate after control_text, see control_response
     SERVER_CONTROL_ACTION_RESPONSE_CANCEL, // stop the response being generated
     SERVER_CONTROL_ACTION_CLEAR,           // drop the conversation
     SERVER_CONTROL_ACTION_MARK,            // remember the conversation as it is, under the name control_text
-    SERVER_CONTROL_ACTION_ROLLBACK,        // go back to the mark control_text, later marks are dropped
+    SERVER_CONTROL_ACTION_ROLLBACK,        // go back to the mark control_text (empty: to the start), later marks are dropped
     SERVER_CONTROL_ACTION_SNAPSHOT_SAVE,   // keep the whole conversation in host memory under the name control_text
     SERVER_CONTROL_ACTION_SNAPSHOT_LOAD,   // replace the conversation by the snapshot control_text (it stays)
     SERVER_CONTROL_ACTION_SNAPSHOT_DROP,   // free the snapshot control_text
@@ -123,6 +123,9 @@ struct task_params {
     std::vector<float>    control_audio; // PCM F32 samples for SERVER_CONTROL_ACTION_AUDIO_APPEND
     std::string           control_text;  // raw text, special tokens are parsed
     server_control_response control_response;
+
+    // the transcription of user audio of a realtime conversation: it waits while a realtime response is prepared or generated
+    bool yield_realtime = false;
 
     // reported in generation_settings, parsing itself is owned by the chat session
     common_chat_format      chat_format      = COMMON_CHAT_FORMAT_CONTENT_ONLY;

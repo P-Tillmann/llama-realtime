@@ -9,6 +9,7 @@
 #include "mtmd-helper.h"
 #include "sampling.h"
 
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <map>
@@ -44,12 +45,29 @@ struct server_realtime_deps {
     // false on error, or when should_stop says so while it waits for the slot or the text
     std::function<bool(const std::vector<float> & pcm, int rate, const std::string & language, std::string & text,
                        int32_t & n_input, int32_t & n_output, const std::function<bool()> & should_stop)> transcribe;
+
+    // realtime responses being prepared or generated: the tasks with yield_realtime wait for them
+    std::atomic<int> & n_hot;
 };
 
 // a realtime conversation over websocket, for chat models with audio input (e.g. LFM3-Audio, Gemma 4, Voxtral, Ultravox):
 // the audio is prefilled as it arrives if the model can stream it, otherwise at the end of the turn;
 // responses follow output_modalities or the model's own switching
 void server_realtime_conversation(const server_realtime_deps & deps, server_http_context::ws_conn & conn);
+
+// the memory state of the long prompts that conversations start with (instructions and tools), shared by the slots:
+// a context that starts with the same tokens loads the state and decodes only what follows
+struct server_realtime_prompts {
+    struct entry {
+        llama_tokens         tokens;
+        std::vector<uint8_t> state;
+        uint64_t             used = 0;
+    };
+    static constexpr size_t min_tokens  = 1024;
+    static constexpr size_t max_entries = 2;
+    std::vector<entry> entries;
+    uint64_t           n_use = 0;
+};
 
 // one control of a realtime conversation
 struct server_realtime_op {
@@ -63,7 +81,8 @@ struct server_realtime_op {
 // the controls run in order; the sequence is decoded by its own calls, not in the shared batch
 struct server_realtime_slot {
     server_realtime_slot(llama_context * ctx, mtmd_context * mctx, llama_seq_id seq_id, int32_t n_ctx,
-                         const common_params_sampling & sampling, server_response & queue_results, int id_task, int index);
+                         const common_params_sampling & sampling, server_response & queue_results, int id_task, int index,
+                         bool swa_full, server_realtime_prompts & prompts);
 
     void push(server_realtime_op && op);
     void cancel(); // stops the response being generated
@@ -92,7 +111,7 @@ private:
     enum error_type error_type = ERROR_TYPE_SERVER;
     bool        faulted    = false; // after a failed control: only CLEAR and SNAPSHOT_DROP run
     int32_t     n_clears   = 0;
-    llama_pos   n_past     = 0;     // positions of the conversation in the sequence
+    llama_pos   n_past     = 0;     // positions of the conversation in the sequence, with the pending tokens
     bool        responding = false;
     bool        cancelled  = false;
     int32_t     n_predict  = 0;
@@ -126,8 +145,27 @@ private:
     };
     std::map<std::string, snapshot> snapshots;
 
+    // tokens at the end of the conversation that are not in the memory yet: they go in with the next decode,
+    // a decode takes about the time of a generated token however small it is
+    llama_tokens pending;
+
+    // the encoded audio of the last turns: the same audio goes into another context without the encoder
+    struct audio_part {
+        llama_tokens       tokens; // or
+        std::vector<float> rows;
+    };
+    struct audio_turn {
+        std::vector<float>      pcm;
+        std::vector<audio_part> parts;
+    };
+    static constexpr size_t max_audio_turns = 16;
+    std::deque<audio_turn>  audio_turns;
+    audio_turn              audio_open; // of the stream
+
     mtmd::audio_stream_ptr stream;   // the audio of the open turn, for models that take audio as it arrives
     bool                   streaming = false; // false: the audio of a turn is held and encoded at its end
+    bool                   swa_full  = false; // --swa-full: the memory goes back to a mark without a saved state
+    server_realtime_prompts & prompts;
     std::vector<float>     turn_pcm;  // the audio of the open turn, for models that take it whole
     mtmd_helper::gen_audio gen;      // set if the model generates audio
     std::vector<float>     h_state;  // hidden state that the gen-audio pipeline steps from
@@ -137,9 +175,14 @@ private:
     bool fail(const std::string & msg, enum error_type type = ERROR_TYPE_SERVER);
     bool run();
     void send_result(common_chat_input content, std::vector<float> audio, bool response_done = false);
+    bool eval(const llama_token * tokens, const float * rows, int32_t n, llama_pos p0, bool logits_last);
     bool decode(const llama_token * tokens, const float * rows, int32_t n, bool logits_last);
+    bool flush(bool logits_last = false);
+    int32_t load_prompt(const llama_tokens & toks);
+    void    save_prompt(const llama_tokens & toks);
     bool audio_rows();
     bool audio_whole();
+    bool audio_end(const std::vector<float> & pcm);
     void sample_next();
     std::string piece(llama_token tok) const;
     bool response_start(const server_realtime_op & op);

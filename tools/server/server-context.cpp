@@ -1043,6 +1043,11 @@ public:
     std::shared_ptr<server_voices>     voices;
     std::shared_ptr<server_asr>        asr; // speech recognition of realtime sessions for models without audio input
 
+    // realtime responses being prepared or generated, see task_params::yield_realtime
+    std::atomic<int> n_realtime_hot{0};
+
+    server_realtime_prompts realtime_prompts;
+
     bool has_cap_tts() const {
         return mtmd_cap.audio_gen;
     }
@@ -1115,6 +1120,10 @@ private:
     // slots / clients
     std::vector<server_slot> slots;
 
+    bool slot_yields(const server_slot & slot) const {
+        return slot.task && slot.task->params.yield_realtime && n_realtime_hot > 0;
+    }
+
     int trace = 0;        // env: LLAMA_TRACE
     int slots_debug = 0;  // env: LLAMA_SERVER_SLOTS_DEBUG
     int slots_n_diff = 0; // env: LLAMA_SERVER_SLOTS_N_DIFF
@@ -1155,6 +1164,7 @@ private:
 
         ctx_tgt = nullptr;
         model_tgt = nullptr;
+        realtime_prompts.entries.clear();
 
         mtmd_free(mctx);
         mctx = nullptr;
@@ -2169,7 +2179,8 @@ private:
         // no prompt either, the session appends text and audio and asks for responses with its controls
         if (slot.task->type == SERVER_TASK_TYPE_REALTIME) {
             slot.rt = std::make_unique<server_realtime_slot>(ctx_tgt, mctx, slot.id, slot.n_ctx, slot.task->params.sampling,
-                                                             queue_results, slot.task->id, slot.task->index);
+                                                             queue_results, slot.task->id, slot.task->index, params_base.swa_full,
+                                                             realtime_prompts);
             slot.prompt_clear();
             slot.stats.update_prompt_start();
             slot.state      = SLOT_STATE_GENERATING;
@@ -3621,7 +3632,7 @@ private:
             bool all_idle = true;
 
             for (auto & slot : slots) {
-                if (slot.is_processing() && !slot.audio_wait) {
+                if (slot.is_processing() && !slot.audio_wait && !slot_yields(slot)) {
                     all_idle = false;
                     break;
                 }
@@ -3902,6 +3913,10 @@ private:
                 return;
             }
 
+            if (slot_yields(slot)) {
+                return;
+            }
+
             if (slot.audio_stream && !slot_audio_step(slot)) {
                 return; // waiting for audio, or the stream ended
             }
@@ -4045,6 +4060,10 @@ private:
                 }
 
                 if (!slot.is_processing() || slot.task->type == SERVER_TASK_TYPE_TTS || slot.task->type == SERVER_TASK_TYPE_REALTIME) {
+                    return;
+                }
+
+                if (slot_yields(slot)) {
                     return;
                 }
 
@@ -6250,6 +6269,7 @@ void server_routes::init_routes() {
             task.params.res_type          = TASK_RESPONSE_TYPE_OAI_ASR;
             task.params.oaicompat_cmpl_id = gen_chatcmplid();
             task.params.oaicompat_model   = meta->model_name;
+            task.params.yield_realtime    = true;
             std::vector<server_task> tasks;
             tasks.push_back(std::move(task));
             rd.post_tasks(std::move(tasks), session);
@@ -6300,7 +6320,7 @@ void server_routes::init_routes() {
         if ((ctx_server.mtmd_cap.audio_stream || ctx_server.mtmd_cap.audio || ctx_server.asr) && ctx_server.mtmd_cap.chat && !live_asr) {
             server_realtime_conversation({queue_tasks, queue_results, *meta, params, ctx_server.mctx, ctx_server.mtmd_cap, ctx_server.vocab,
                                           ctx_server.vad_model, ctx_server.turn_model, ctx_server.voices, ctx_server.asr,
-                                          meta->chat_params.allow_audio ? realtime_transcribe : nullptr}, conn);
+                                          meta->chat_params.allow_audio ? realtime_transcribe : nullptr, ctx_server.n_realtime_hot}, conn);
             return;
         }
 
