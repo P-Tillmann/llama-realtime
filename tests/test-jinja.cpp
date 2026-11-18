@@ -2,6 +2,8 @@
 #include <iostream>
 #include <random>
 #include <cstdlib>
+#include <fstream>
+#include <sstream>
 
 #include "chat-tts-norm.h"
 #include "json.h"
@@ -41,6 +43,7 @@ static void test_caps(testing & t);
 static void test_string_parts(testing & t);
 static void test_fuzzing(testing & t);
 static void test_tts_norm_patterns(testing & t);
+static void test_pocket_tts_german(testing & t);
 
 static bool g_python_mode = false;
 
@@ -78,6 +81,7 @@ int main(int argc, char *argv[]) {
     t.test("array methods", test_array_methods);
     t.test("object methods", test_object_methods);
     t.test("tts norm patterns", test_tts_norm_patterns);
+    t.test("pocket tts german", test_pocket_tts_german);
     if (!g_python_mode) {
         t.test("hasher", test_hasher);
         t.test("stats", test_stats);
@@ -2861,6 +2865,41 @@ static void test_tts_norm_patterns(testing & t) {
         test_template_error(t, "error: wide lookbehind",              "{{ tts_norm_scan('x', '(?<=ab)c') }}",  "lookbehind must contain exactly one codepoint matcher", true);
         test_template_error(t, "error: missing group in replacement", "{{ tts_norm_sub('x', '(a)', '%2') }}",  "group %2 does not exist", true);
         test_template_error(t, "error: bad rules",                    "{{ tts_norm_scan('x', 1) }}",           "rules must be a string, a dict or a list", true);
+    }
+}
+
+// tools/tts/pocket-tts-german.jinja: the "tts" task template of the German Pocket TTS model, which speaks digits as they are
+static void test_pocket_tts_german(testing & t) {
+    std::ifstream f("tools/tts/pocket-tts-german.jinja");
+    std::stringstream ss;
+    ss << f.rdbuf();
+    const std::string tmpl = ss.str();
+    t.assert_true("template file found (run from the repository root)", !tmpl.empty());
+    if (tmpl.empty()) {
+        return;
+    }
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {"Pegel auf 0,5 Volt.",                             "Pegel auf null komma fünf Volt."},
+        {"Triggerpegel 1,5 V.",                             "Triggerpegel eins komma fünf Volt."},
+        {"Kanal 1 steht auf 2 Volt pro Teilung.",           "Kanal eins steht auf zwei Volt pro Teilung."},
+        {"Zeitbasis 1 Sekunde pro Teilung.",                "Zeitbasis eine Sekunde pro Teilung."},
+        {"Kanal 2 liegt bei -2 Teilungen.",                 "Kanal zwei liegt bei minus zwei Teilungen."},
+        {"Die Zeitbasis ist 1 ms/div, also 0.001 Sekunden.", "Die Zeitbasis ist eine Millisekunde pro Teilung, also null komma null null eins Sekunden."},
+        {"Frequenz 1 kHz, Amplitude 1 V.",                  "Frequenz ein Kilohertz, Amplitude ein Volt."},
+        {"Sinus, 1.500 Hz, 21 %.",                          "Sinus, tausendfünfhundert Hertz, einundzwanzig Prozent."},
+        {"200 µs und 5V und 2x Dehnung.",                   "zweihundert Mikrosekunden und fünf Volt und zwei x Dehnung."},
+        {"CH1 auf 10 mV, Bereich 5-10 V.",                  "CH eins auf zehn Millivolt, Bereich fünf bis zehn Volt."},
+        {"±40 V, Phase 90°, 25 °C.",                        "plus minus vierzig Volt, Phase neunzig Grad, fünfundzwanzig Grad Celsius."},
+        {"1.234.567 Werte und 1000001 Punkte.",             "eine Million zweihundertvierunddreißigtausendfünfhundertsiebenundsechzig Werte und eine Million eins Punkte."},
+        {"Serie 007 und 3,14159.",                          "Serie null null sieben und drei komma eins vier eins fünf neun."},
+        {"101 und 110 und 999 und 100.",                    "hunderteins und hundertzehn und neunhundertneunundneunzig und hundert."},
+        {"Am 18.11.2026 und vom 1.3.1999 bis 21.07.",       "Am achtzehnten November zweitausendsechsundzwanzig und vom ersten März neunzehnhundertneunundneunzig bis einundzwanzigsten Juli"},
+        {"1 Ampere und 1 Messung.",                         "ein Ampere und eine Messung."},
+        {"0 und 1234567890123 und 3 μs und 4 Div.",          "null und eins zwei drei vier fünf sechs sieben acht neun null eins zwei drei und drei Mikrosekunden und vier Teilungen."},
+        {"Keine Zahl hier.",                                "Keine Zahl hier."},
+    };
+    for (const auto & [in, out] : cases) {
+        test_template(t, in, tmpl, {{"messages", json::array({{{"role", "user"}, {"content", in}}})}}, out, true);
     }
 }
 

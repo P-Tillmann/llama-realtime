@@ -71,6 +71,17 @@ python convert_hf_to_gguf.py path/to/pocket-tts/languages/english --outfile pock
 python convert_hf_to_gguf.py path/to/pocket-tts/languages/english --mmproj --outfile mmproj-pocket-tts.gguf
 ```
 
+**Numbers in German:** Pocket TTS speaks the text as it is and skips digits ("0,5 V" comes out as almost nothing). [pocket-tts-german.jinja](pocket-tts-german.jinja) is a `tts` task template that spells out numbers, decimals, signs, ranges, dates and common unit symbols ("0,5 V" becomes "null komma fünf Volt"). It works through the normalization functions of [docs/tts-norm-patterns.md](../../docs/tts-norm-patterns.md). Write it into the German model, then `llama-tts`, `/v1/audio/speech` and `--voice-model` all use it; the text of a response (and its transcript) keeps the digits:
+
+```sh
+python -c "import json,sys; print(json.dumps([{'name': 'tts', 'template': open(sys.argv[1], encoding='utf-8').read()}]))" \
+    tools/tts/pocket-tts-german.jinja > tts-template.json
+python gguf-py/gguf/scripts/gguf_new_metadata.py pocket-tts-german.gguf pocket-tts-german-norm.gguf \
+    --chat-template "$(cat tts-template.json)"
+```
+
+The cases it is tested with are in `tests/test-jinja.cpp` ("pocket tts german").
+
 ## Soprano
 
 Available params:

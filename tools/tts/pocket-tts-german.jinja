@@ -1,0 +1,89 @@
+{#- "tts" task template for the German Pocket TTS model: it speaks digits as they are, so numbers, signs and units are spelled out. See docs/tts-norm-patterns.md -#}
+{%- set ones = ['null', 'eins', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun', 'zehn', 'elf', 'zwölf',
+                'dreizehn', 'vierzehn', 'fünfzehn', 'sechzehn', 'siebzehn', 'achtzehn', 'neunzehn'] -%}
+{%- set tens = ['', '', 'zwanzig', 'dreißig', 'vierzig', 'fünfzig', 'sechzig', 'siebzig', 'achtzig', 'neunzig'] -%}
+{#- symbol: [word, word for exactly one, feminine] -#}
+{%- set units = {
+    'V': ['Volt', 'Volt', false], 'mV': ['Millivolt', 'Millivolt', false], 'µV': ['Mikrovolt', 'Mikrovolt', false], 'kV': ['Kilovolt', 'Kilovolt', false],
+    'A': ['Ampere', 'Ampere', false], 'mA': ['Milliampere', 'Milliampere', false], 'µA': ['Mikroampere', 'Mikroampere', false],
+    's': ['Sekunden', 'Sekunde', true], 'ms': ['Millisekunden', 'Millisekunde', true], 'µs': ['Mikrosekunden', 'Mikrosekunde', true],
+    'us': ['Mikrosekunden', 'Mikrosekunde', true], 'ns': ['Nanosekunden', 'Nanosekunde', true], 'ps': ['Pikosekunden', 'Pikosekunde', true],
+    'Hz': ['Hertz', 'Hertz', false], 'kHz': ['Kilohertz', 'Kilohertz', false], 'MHz': ['Megahertz', 'Megahertz', false], 'GHz': ['Gigahertz', 'Gigahertz', false],
+    'W': ['Watt', 'Watt', false], 'mW': ['Milliwatt', 'Milliwatt', false],
+    'Ω': ['Ohm', 'Ohm', false], 'kΩ': ['Kiloohm', 'Kiloohm', false], 'MΩ': ['Megaohm', 'Megaohm', false],
+    'dB': ['Dezibel', 'Dezibel', false], '%': ['Prozent', 'Prozent', false], '°C': ['Grad Celsius', 'Grad Celsius', false], '°': ['Grad', 'Grad', false],
+    'div': ['Teilungen', 'Teilung', true], 'Div': ['Teilungen', 'Teilung', true],
+} -%}
+{#- 1 to 99; one is "eins" at the end of a number, else "ein" (einundzwanzig, hunderteins, eintausend) -#}
+{%- macro below100(n, last) -%}
+  {%- if n == 1 -%}{{ 'eins' if last else 'ein' }}
+  {%- elif n < 20 -%}{{ ones[n] }}
+  {%- else -%}{{ ((('ein' if n % 10 == 1 else ones[n % 10]) ~ 'und') if n % 10 else '') ~ tens[(n / 10) | int] }}
+  {%- endif -%}
+{%- endmacro -%}
+{%- macro below1000(n, last) -%}
+  {%- set h = (n / 100) | int -%}{%- set r = n % 100 -%}
+  {{- ((ones[h] if h > 1 else '') ~ 'hundert') if h else '' }}{{ below100(r, last) if r else '' }}
+{%- endmacro -%}
+{%- macro integer(n) -%}
+  {%- set b = (n / 1000000000) | int -%}{%- set m = ((n / 1000000) | int) % 1000 -%}
+  {%- set t = ((n / 1000) | int) % 1000 -%}{%- set r = n % 1000 -%}
+  {%- set parts = [] -%}
+  {%- if b -%}{%- set parts = parts + [('eine Milliarde' if b == 1 else below1000(b, true) ~ ' Milliarden')] -%}{%- endif -%}
+  {%- if m -%}{%- set parts = parts + [('eine Million' if m == 1 else below1000(m, true) ~ ' Millionen')] -%}{%- endif -%}
+  {%- if t or r -%}{%- set parts = parts + [((('' if t == 1 else below1000(t, false)) ~ 'tausend') if t else '') ~ (below1000(r, true) if r else '')] -%}{%- endif -%}
+  {{- parts | join(' ') if parts else 'null' }}
+{%- endmacro -%}
+{%- macro digits(s) -%}
+  {%- for i in range(s | length) -%}{{ ' ' if i else '' }}{{ ones[s[i] | int] }}{%- endfor -%}
+{%- endmacro -%}
+{#- digits of an integer part, with thousands dots; a leading zero or more than 12 digits are read digit by digit -#}
+{%- macro whole(s, one) -%}
+  {%- set d = s.replace('.', '') -%}
+  {%- if (d | length) > 12 or ((d | length) > 1 and d[0] == '0') -%}{{ digits(d) }}
+  {%- elif d == '1' and one -%}{{ one }}
+  {%- else -%}{{ integer(d | int) }}
+  {%- endif -%}
+{%- endmacro -%}
+{%- macro sign(s) -%}
+  {{- {'-': 'minus ', '−': 'minus ', '+': 'plus ', '±': 'plus minus '}.get(s, '') -}}
+{%- endmacro -%}
+{#- day as dative ordinal (am achtzehnten), month by name, years before 2000 as "neunzehnhundert..." -#}
+{%- set months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'] -%}
+{%- macro date(d, m, y) -%}
+  {%- set d = d | int -%}{%- set y = y | int if y else 0 -%}
+  {{- {'1': 'ersten', '3': 'dritten', '7': 'siebten', '8': 'achten'}.get(d | string, below100(d, false) ~ ('sten' if d >= 20 else 'ten')) ~ ' ' ~ months[(m | int) - 1] -}}
+  {{- (' ' ~ ((below100((y / 100) | int, false) ~ 'hundert' ~ (below100(y % 100, true) if y % 100 else '')) if 1100 <= y < 2000 else integer(y))) if y else '' -}}
+{%- endmacro -%}
+{%- set number ='(?:(?<![%w])([%-−+±]))?(?:([1-9]%d?%d?(?:%.%d%d%d)+)(?!%d)(?:,(%d+))?|(%d+)(?:[,.](%d+)(?![%d.,]%d))?)' -%}
+{%- set symbol = '(?:mV|µV|μV|kV|mA|µA|μA|ms|µs|μs|us|ns|ps|kHz|MHz|GHz|Hz|mW|kΩ|MΩ|dB|°C|V|A|s|W|Ω|div|Div|%%|°)' -%}
+{%- for s in tts_norm_scan(messages[0].content, [
+    ['date',  '(?<![%d.])([12]%d|3[01]|0?[1-9])%.(1[0-2]|0?[1-9])%.(%d%d%d%d)?(?!%d)'],
+    ['range', '(?<=%d)[%-–](?=%d)'],
+    ['glued', '(?<=%a)(%d+)'],
+    ['unit',  number ~ '(%s?)(' ~ symbol ~ ')(%/[dD][iI][vV])?(?![%w])'],
+    ['noun',  number ~ '(%s+)(%u%a*)'],
+    ['before', number ~ '(?=%a)'],
+    ['num',   number],
+]) -%}
+  {%- if s.rule == 'date' -%}{{ date(s.groups[0], s.groups[1], s.groups[2]) }}
+  {%- elif s.rule == 'range' -%}{{ ' bis ' }}
+  {%- elif s.rule == 'glued' -%}{{ ' ' ~ whole(s.groups[0], '') }}
+  {%- elif not s.rule -%}{{ s.text }}
+  {%- else -%}
+    {%- set g = s.groups -%}
+    {%- set int_part = g[1] or g[3] -%}{%- set frac = g[2] or g[4] -%}
+    {%- set is_one = int_part == '1' and not frac -%}
+    {%- if s.rule == 'unit' -%}
+      {%- set u = units[g[6].replace('μ', 'µ')] -%}
+      {%- set word = u[1] if is_one else u[0] -%}
+      {{- sign(g[0]) ~ whole(int_part, '' if frac else ('eine' if u[2] else 'ein')) ~ (' komma ' ~ digits(frac) if frac else '') ~ ' ' ~ word ~ (' pro Teilung' if g[7] else '') }}
+    {%- elif s.rule == 'noun' -%}
+      {%- set n = g[6] -%}
+      {%- set fem = n[-1:] == 'e' and n != 'Ampere' or n[-3:] in ['ung', 'eit', 'ion', 'enz'] -%}
+      {{- sign(g[0]) ~ whole(int_part, '' if frac else ('eine' if fem else 'ein')) ~ (' komma ' ~ digits(frac) if frac else '') ~ g[5] ~ n }}
+    {%- else -%}
+      {{- sign(g[0]) ~ whole(int_part, '') ~ (' komma ' ~ digits(frac) if frac else '') ~ (' ' if s.rule == 'before' else '') }}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
