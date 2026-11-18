@@ -63,6 +63,23 @@ class server_voices {
     std::vector<info>                                infos;
 };
 
+// a whole text spoken by a voice model, in the pieces that a response is spoken in; another thread takes the audio
+class server_voice_speech {
+  public:
+    server_voice_speech(std::shared_ptr<server_voices> voices, int model, const std::string & voice, const std::string & text);
+    ~server_voice_speech(); // stops the voice if it still speaks
+
+    // waits for audio (mono PCM at the sample rate of the model)
+    // false: no more audio, the text is spoken, the voice failed or should_stop said so
+    bool next(std::vector<float> & pcm, const std::function<bool()> & should_stop);
+    bool failed() const;
+
+  private:
+    struct state;
+    std::shared_ptr<state>         st; // shared with the jobs, they can outlive the speech
+    std::shared_ptr<server_voices> voices;
+};
+
 // splits the text of a response into pieces to speak: whole sentences, the first one may end at a comma
 struct server_voice_segmenter {
     std::string buf;

@@ -217,6 +217,17 @@ std::string pcm_f32_to_s16(const float * samples, size_t n) {
     return bytes;
 }
 
+std::string wav16_header(uint32_t data_size, int32_t rate) {
+    const uint32_t riff_size = data_size == UINT32_MAX ? UINT32_MAX : 36 + data_size;
+    const uint32_t fmt_size  = 16, rate_u = (uint32_t) rate, byte_rate = rate_u * 2;
+    const uint16_t pcm_fmt   = 1, ch = 1, align = 2, bits = 16;
+    std::string h;
+    auto put = [&h](const void * p, size_t n) { h.append((const char *) p, n); };
+    put("RIFF", 4); put(&riff_size, 4); put("WAVE", 4); put("fmt ", 4); put(&fmt_size, 4); put(&pcm_fmt, 2); put(&ch, 2);
+    put(&rate_u, 4); put(&byte_rate, 4); put(&align, 2); put(&bits, 2); put("data", 4); put(&data_size, 4);
+    return h;
+}
+
 //
 // model output modalities
 //

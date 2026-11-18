@@ -9,6 +9,7 @@
 #include "sampling.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <condition_variable>
 #include <deque>
@@ -347,6 +348,75 @@ int server_voices::find(const std::string & selector, std::string & voice) const
 
 void server_voices::submit(int model, server_voice_job job) {
     voice_models.at(model)->submit(std::move(job));
+}
+
+//
+// speech
+//
+
+struct server_voice_speech::state {
+    std::mutex              mutex;
+    std::condition_variable cv;
+    std::vector<float>      pcm;        // not taken yet
+    size_t                  n_jobs = 0; // not done yet
+    bool                    failed = false;
+    std::shared_ptr<std::atomic<bool>> cancelled = std::make_shared<std::atomic<bool>>(false);
+};
+
+server_voice_speech::server_voice_speech(std::shared_ptr<server_voices> voices_, int model, const std::string & voice, const std::string & text)
+        : st(std::make_shared<state>()), voices(std::move(voices_)) {
+    server_voice_segmenter segmenter;
+    auto pieces = segmenter.push(text);
+    pieces.push_back(segmenter.flush());
+    pieces.erase(std::remove_if(pieces.begin(), pieces.end(), [](const server_voice_segmenter::piece & p) { return p.text.empty(); }), pieces.end());
+
+    st->n_jobs = pieces.size(); // all of them before the first one is done
+    for (const auto & p : pieces) {
+        server_voice_job job;
+        job.text      = p.text;
+        job.voice     = voice;
+        job.cancelled = st->cancelled;
+        job.on_audio  = [st = st](const float * pcm, size_t n) {
+            {
+                std::lock_guard<std::mutex> lock(st->mutex);
+                st->pcm.insert(st->pcm.end(), pcm, pcm + n);
+            }
+            st->cv.notify_one();
+        };
+        job.on_done = [st = st](bool ok, int32_t) {
+            {
+                std::lock_guard<std::mutex> lock(st->mutex);
+                if (!ok && !st->cancelled->load()) {
+                    st->failed = true;
+                    st->cancelled->store(true); // the pieces after a failed one are not spoken
+                }
+                st->n_jobs--;
+            }
+            st->cv.notify_one();
+        };
+        voices->submit(model, std::move(job));
+    }
+}
+
+server_voice_speech::~server_voice_speech() {
+    st->cancelled->store(true);
+}
+
+bool server_voice_speech::next(std::vector<float> & pcm, const std::function<bool()> & should_stop) {
+    pcm.clear();
+    std::unique_lock<std::mutex> lock(st->mutex);
+    while (!st->cv.wait_for(lock, std::chrono::milliseconds(100), [this]() { return !st->pcm.empty() || st->n_jobs == 0; })) {
+        if (should_stop()) {
+            return false;
+        }
+    }
+    pcm.swap(st->pcm);
+    return !pcm.empty();
+}
+
+bool server_voice_speech::failed() const {
+    std::lock_guard<std::mutex> lock(st->mutex);
+    return st->failed;
 }
 
 //

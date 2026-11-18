@@ -6237,19 +6237,10 @@ void server_routes::init_routes() {
                                        int32_t & n_input, int32_t & n_output, const std::function<bool()> & should_stop) {
         try {
             // a 16-bit PCM WAV of the audio
-            raw_buffer wav;
-            auto put = [&wav](const void * p, size_t n) { wav.insert(wav.end(), (const uint8_t *) p, (const uint8_t *) p + n); };
-            const uint32_t data_sz = (uint32_t) pcm.size() * 2, riff_sz = 36 + data_sz, fmt_sz = 16, rate_u = rate, byte_rate = rate * 2;
-            const uint16_t pcm_fmt = 1, ch = 1, align = 2, bits = 16;
-            put("RIFF", 4); put(&riff_sz, 4); put("WAVE", 4); put("fmt ", 4); put(&fmt_sz, 4); put(&pcm_fmt, 2); put(&ch, 2);
-            put(&rate_u, 4); put(&byte_rate, 4); put(&align, 2); put(&bits, 2); put("data", 4); put(&data_sz, 4);
-            for (float x : pcm) {
-                const int16_t v = (int16_t) std::lround(std::max(-1.0f, std::min(1.0f, x)) * 32767.0f);
-                put(&v, 2);
-            }
+            const std::string wav = wav16_header((uint32_t) pcm.size() * 2, rate) + pcm_f32_to_s16(pcm.data(), pcm.size());
 
             std::map<std::string, uploaded_file> in_files;
-            in_files["file"].data = std::move(wav);
+            in_files["file"].data.assign(wav.begin(), wav.end());
             std::vector<raw_buffer> files;
             json inp = json::object();
             if (!language.empty()) {
@@ -7183,11 +7174,105 @@ std::unique_ptr<server_res_generator> server_routes::handle_rerank_impl(const se
     return res;
 }
 
+static std::string tts_content_type(const std::string & response_format, int sample_rate) {
+    // raw LE mono samples; audio/L16 would imply 16-bit big-endian (RFC 2586)
+    const std::string pcm_type = "audio/pcm;rate=" + std::to_string(sample_rate);
+    return response_format == "pcm16" ? pcm_type + ";encoding=signed-int;bits=16"
+        : response_format == "pcm" ? pcm_type + ";encoding=float;bits=32"
+        : "audio/wav";
+}
+
+// /tts of a server whose model cannot speak: a voice of --voice-model speaks the text, as it speaks a realtime response
+// the sampling params, lang and speaker_ref of the request have no effect on it
+std::unique_ptr<server_res_generator> server_routes::handle_tts_voice_impl(std::unique_ptr<server_res_generator> res,
+                                                                           const server_http_req & req, const json & body) {
+    const std::string text = json_value(body, "input", json_value(body, "prompt", std::string()));
+    if (text.empty()) {
+        res->error(format_error_response("\"input\" must be a non-empty string", ERROR_TYPE_INVALID_REQUEST));
+        return res;
+    }
+    if (req.files.count("speaker_ref") > 0 || !json_value(body, "speaker_ref_b64", std::string()).empty()) {
+        res->error(format_error_response("\"speaker_ref\" cannot be used with a voice model, see speaker= of --voice-model", ERROR_TYPE_INVALID_REQUEST));
+        return res;
+    }
+
+    // NAME, VOICE or NAME/VOICE as in a realtime session; a model with predefined voices only speaks with one of them
+    const std::string selector = json_value(body, "voice", std::string());
+    std::string voice;
+    const int model = ctx_server.voices->find(selector, voice);
+    const auto * info = model < 0 ? nullptr : &ctx_server.voices->models()[model];
+    if (!info || (!voice.empty() && !info->voices.empty() && std::find(info->voices.begin(), info->voices.end(), voice) == info->voices.end())) {
+        res->error(format_error_response("unknown voice \"" + selector + "\", see --voice-model", ERROR_TYPE_INVALID_REQUEST));
+        return res;
+    }
+
+    const std::string response_format = json_value(body, "response_format", std::string("wav"));
+    const bool wav    = response_format != "pcm" && response_format != "pcm16";
+    const bool stream = json_value(body, "stream", false);
+    // the voice outputs float32 samples
+    auto encode = [response_format](const std::vector<float> & pcm) {
+        return response_format == "pcm" ? std::string((const char *) pcm.data(), pcm.size() * sizeof(float))
+                                        : pcm_f32_to_s16(pcm.data(), pcm.size());
+    };
+
+    auto speech = std::make_shared<server_voice_speech>(ctx_server.voices, model, voice, text);
+    std::vector<float> pcm;
+    bool has_audio = speech->next(pcm, req.should_stop);
+    if (!stream) {
+        for (std::vector<float> more; has_audio && speech->next(more, req.should_stop); ) {
+            pcm.insert(pcm.end(), more.begin(), more.end());
+        }
+    }
+    if (req.should_stop()) {
+        return res; // connection is closed
+    }
+    if (speech->failed()) {
+        res->error(format_error_response("the voice model failed to speak the text", ERROR_TYPE_SERVER));
+        return res;
+    }
+    if (!has_audio) {
+        res->error(format_error_response("\"input\" has no text to speak", ERROR_TYPE_INVALID_REQUEST));
+        return res;
+    }
+
+    res->status       = 200;
+    res->content_type = tts_content_type(response_format, info->sample_rate);
+    if (!stream) {
+        // RIFF chunk sizes are 32-bit
+        if (wav && pcm.size() > ((size_t) UINT32_MAX - 36) / 2) {
+            res->error(format_error_response("the audio is too long for a WAV file", ERROR_TYPE_SERVER));
+            return res;
+        }
+        res->data = (wav ? wav16_header((uint32_t) (pcm.size() * 2), info->sample_rate) : std::string()) + encode(pcm);
+        return res;
+    }
+
+    // as the stream of the model's own audio: a WAV header without a size, then the samples as they come
+    res->data = (wav ? wav16_header(UINT32_MAX, info->sample_rate) : std::string()) + encode(pcm);
+    res->set_next([res_this = res.get(), speech, encode](std::string & output) -> bool {
+        if (!res_this->data.empty()) {
+            output = std::move(res_this->data);
+            res_this->data.clear();
+            return true;
+        }
+        std::vector<float> pcm;
+        if (!speech->next(pcm, [res_this]() { return res_this->should_stop(); })) {
+            return false;
+        }
+        output = encode(pcm);
+        return true;
+    });
+    return res;
+}
+
 std::unique_ptr<server_res_generator> server_routes::handle_tts_impl(const server_http_req & req, json body) {
     auto res = create_response();
     res->set_req(&req); // will also set spipe if needed
 
     if (!ctx_server.has_cap_tts()) {
+        if (ctx_server.voices) {
+            return handle_tts_voice_impl(std::move(res), req, body);
+        }
         res->error(format_error_response("this server does not support audio generation", ERROR_TYPE_NOT_SUPPORTED));
         return res;
     }
@@ -7293,11 +7378,7 @@ std::unique_ptr<server_res_generator> server_routes::handle_tts_impl(const serve
     task.id = rd.get_new_id();
     rd.post_task(std::move(task));
 
-    // raw LE mono samples; audio/L16 would imply 16-bit big-endian (RFC 2586)
-    const std::string pcm_type = "audio/pcm;rate=" + std::to_string(info.sample_rate);
-    const std::string content_type = pcm16 ? pcm_type + ";encoding=signed-int;bits=16"
-        : response_format == "pcm" ? pcm_type + ";encoding=float;bits=32"
-        : "audio/wav";
+    const std::string content_type = tts_content_type(response_format, info.sample_rate);
 
     // the pipeline outputs float32 samples
     auto take_audio = [pcm16](server_task_result_tts * tts_res) {

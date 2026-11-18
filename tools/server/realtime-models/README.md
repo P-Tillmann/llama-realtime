@@ -60,6 +60,8 @@ llama-server -hf ggml-org/gemma-4-E2B-it-GGUF \
 
 A session selects a voice with `session.audio.output.voice` set to `NAME`, `VOICE` or `NAME/VOICE`. Unknown names, e.g. OpenAI's `marin`, fall back to the first model and its default voice. With voices loaded, `output_modalities: ["audio"]` returns `response.output_audio.delta`, resampled from the voice to the session rate, together with `response.output_audio_transcript.delta` for each spoken piece as its audio starts. `response.cancel` and barge-in by VAD stop the voice; `conversation.item.truncate` cuts the transcript in the conversation where the audio was cut.
 
+The voices also speak for `/v1/audio/speech` and `/tts` when the language model cannot generate audio itself: a client that knows the sentence to say gets it spoken without a response of the language model, and adds it to the realtime conversation as an assistant message (`conversation.item.create` with `output_text` content). The text is spoken in the same pieces and with the same `tts` template as a response; requests and responses that use one voice model at the same time take turns piece by piece.
+
 Tested with Gemma 4 E2B (Q4_0) on 4 CPU threads, measured from `speech_stopped` to the first audio:
 
 | Voice | Languages | First audio | Note |

@@ -117,6 +117,9 @@ const char * get_media_marker();
 // float samples to signed 16-bit PCM bytes, clamped to [-1, 1]
 std::string pcm_f32_to_s16(const float * samples, size_t n);
 
+// the header of a WAV file of 16-bit mono PCM; data_size is in bytes, UINT32_MAX: not known (a stream)
+std::string wav16_header(uint32_t data_size, int32_t rate);
+
 //
 // model output modalities
 //

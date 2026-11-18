@@ -856,6 +856,8 @@ Causal decoder rerankers (e.g. `Qwen3-VL-Reranker`) have no such limitation.
 
 Returns raw audio bytes (`audio/wav` by default) rather than JSON. For more info, see [tts/README.md](../tts/README.md)
 
+If the model cannot generate audio and the server has voices (`--voice-model`, see [realtime-models](realtime-models/README.md#voices)), a voice speaks the text as it speaks a realtime response. Then `voice` is `NAME`, `VOICE` or `NAME/VOICE` of a voice model (omitted: the first model and its default voice, an unknown name is rejected), `input`, `response_format` and `stream` work as described here, `speaker_ref` is rejected and the other options have no effect.
+
 *Options:*
 
 `input`: The text to speak (alias: `prompt`).
@@ -1668,13 +1670,13 @@ Tools go into the system prompt with the chat template, and the tool calls are p
 
 ### POST `/v1/audio/speech`: OpenAI-compatible Speech API
 
-Generates speech from text, for models that can generate audio. The request is converted to a [`/tts`](#post-tts-generate-speech-audio-from-text) request, so the `/tts` options such as `lang`, `seed` or `speaker_ref_b64` can also be used.
+Generates speech from text, for models that can generate audio and for servers with voices (`--voice-model`). The request is converted to a [`/tts`](#post-tts-generate-speech-audio-from-text) request, so the `/tts` options such as `lang`, `seed` or `speaker_ref_b64` can also be used.
 
 *Options:*
 
 `input`: The text to speak.
 
-`voice`: One of the `voices` listed by `GET /props`, as a name or as `{"id": "..."}`. OpenAI voice names such as `alloy` are not mapped: a model with predefined voices rejects them.
+`voice`: One of the `voices` listed by `GET /props`, as a name or as `{"id": "..."}`. OpenAI voice names such as `alloy` are not mapped: a model with predefined voices rejects them. With `--voice-model` voices see `/tts`.
 
 `response_format`: `wav` or `pcm` (raw signed 16-bit little-endian mono samples, no header). Defaults to `wav`, unlike the `mp3` of the OpenAI API. Other formats are rejected. The sample rate is the one of the model and is not resampled to the 24 kHz of the OpenAI API, the response `Content-Type` carries it.
 
