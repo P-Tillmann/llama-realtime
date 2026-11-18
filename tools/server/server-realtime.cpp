@@ -442,6 +442,7 @@ struct realtime_conversation {
     std::string                           speech_item_id;  // the user item of the speech in progress
     std::atomic<bool>                     responding{false};
     std::atomic<bool>                     hot{false}; // a response is in progress, see set_hot()
+    std::atomic<int64_t>                  t_active{0}; // when the last turn was committed or the session stopped being hot
     std::atomic<bool>                     cancel_sent{false};   // the response in progress was cancelled, it ends soon
     std::atomic<bool>                     cancel_by_turn{false}; // by the start of speech (turn detection)
     std::atomic<bool>                     response_ended{false}; // for the idle timeout of the detector
@@ -593,6 +594,21 @@ struct realtime_conversation {
     std::string               own_end_mark;     // after the items of the own context
     uint64_t                  n_snap_use = 0;
     int                       n_snaps    = 0;
+
+    // the home context: the instructions and tools of the response that answered the last audio turn, when they are
+    // not the session's (key empty: they are). While the session is idle the slot takes it, so the next audio streams
+    // into the context that will answer it; the session context waits in its snapshot. A response with another
+    // context and every edit of the conversation go back to the session context first
+    struct home_ctx {
+        std::string                   key;
+        std::string                   instructions;
+        std::vector<common_chat_tool> tools;
+        json                          tools_json;
+    };
+    home_ctx home;
+    bool     at_home    = false; // the slot holds the home context with the conversation as it is (pending_restore is set)
+    bool     own_whole  = false; // the own context in the slot holds the conversation as it is, with its response
+    bool     audio_turn = false; // audio was committed since the last response
 
     // the item or response the results belong to, shared with the result loop
     std::mutex  mutex;
@@ -1277,6 +1293,10 @@ struct realtime_conversation {
         if (audio_open) {
             return true;
         }
+        // the audio goes into the context that is expected to answer it
+        if (away_from_home()) {
+            go_home();
+        }
         if (!put_stale() || !begin_item() || !ensure_turn()) {
             return false;
         }
@@ -1385,8 +1405,13 @@ struct realtime_conversation {
                         const std::string item = "item_" + random_string();
                         send_event({{"type", "input_audio_buffer.timeout_triggered"}, {"audio_start_ms", a.audio_ms},
                                     {"audio_end_ms", a.audio_ms}, {"item_id", item}});
-                        if (type == "realtime" && turn_params->create_response && ensure_turn()) {
-                            on_response_create(json::object(), false);
+                        if (type == "realtime" && turn_params->create_response) {
+                            if (at_home) {
+                                restore_conversation(); // the response is the session's
+                            }
+                            if (put_stale() && ensure_turn()) {
+                                on_response_create(json::object(), false);
+                            }
                         }
                     } break;
             }
@@ -1425,6 +1450,7 @@ struct realtime_conversation {
         }
         has_audio   = false;
         audio_open  = false;
+        audio_turn  = true;
         buf_samples = 0;
 
         conv_item it;
@@ -1459,6 +1485,7 @@ struct realtime_conversation {
         const std::string id = it.id;
         std::vector<float> pcm = it.pcm;
         add_item(std::move(it));
+        t_active = ggml_time_us();
         if (cascade()) {
             if (type == "realtime" && !transcription.is_null()) {
                 std::lock_guard<std::mutex> lock(mutex);
@@ -1491,6 +1518,8 @@ struct realtime_conversation {
                 {"input_token_details", {{"text_tokens", 0}, {"audio_tokens", n_in}}}};
     }
 
+    static constexpr int64_t transcribe_idle_us = 300 * 1000;
+
     // audio.input.transcription: the user audio is transcribed by the ASR model or on another slot, the conversation
     // does not wait for it
     void transcribe_item(const std::string & id, std::vector<float> pcm) {
@@ -1508,6 +1537,11 @@ struct realtime_conversation {
         }
         const std::string lang = json_value(transcription, "language", std::string());
         transcribers.emplace_back([this, id, lang, by_asr, pcm = std::move(pcm)]() {
+            // it shares the GPU and a step of it cannot be interrupted: it starts when the session was idle for a
+            // moment, not between a commit and its response or between a tool call and the response that goes on
+            while (!closed && (hot || ggml_time_us() - t_active < transcribe_idle_us)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
             std::string text;
             int32_t n_in = 0, n_out = 0;
             const bool ok = by_asr ? deps.asr->transcribe(pcm, lang, text, n_in, n_out) :
@@ -1727,9 +1761,10 @@ struct realtime_conversation {
         return true;
     }
 
-    // the items that left the slot (unput_from) go in again
+    // the items that left the slot (unput_from) go in again; they are counted for the session context, an own
+    // context in the slot has the items it was given
     bool put_stale() {
-        if (stale_from == SIZE_MAX) {
+        if (pending_restore || stale_from == SIZE_MAX) {
             return true;
         }
         std::vector<conv_item> tail;
@@ -1819,8 +1854,12 @@ struct realtime_conversation {
     }
 
     // what a context is told before the conversation: its snapshots are reused for the same instructions and tools
-    std::string context_key() const {
+    static std::string context_key(const std::string & instructions, const json & tools_json) {
         return instructions + '\x1f' + tools_json.dump();
+    }
+
+    std::string context_key() const {
+        return context_key(instructions, tools_json);
     }
 
     static std::vector<std::string> ids_of(const std::vector<conv_item> & list) {
@@ -1847,9 +1886,10 @@ struct realtime_conversation {
         return best;
     }
 
-    // keeps the own context in the slot (rolled back to its items) for the next response with the same context
+    // keeps the own context in the slot for the next response with the same context: rolled back to its items, or
+    // as it is at home (own_ctx has the items of the conversation then)
     void keep_own_context() {
-        if (own_ctx.key.empty() || !control(SERVER_CONTROL_ACTION_ROLLBACK, own_end_mark)) {
+        if (own_ctx.key.empty() || (!at_home && !control(SERVER_CONTROL_ACTION_ROLLBACK, own_end_mark))) {
             own_ctx = {};
             return;
         }
@@ -1911,8 +1951,32 @@ struct realtime_conversation {
         return true;
     }
 
-    // after a response with its own context: the session instructions and tools, the conversation as it is
+    // after a response with its own context, or away from home: the session instructions and tools, the conversation
+    // as it is. The home context is kept with all it holds, the audio of the open buffer moves to the session context
     void restore_conversation() {
+        audio_buf held;
+        if (at_home) {
+            if (audio_open && !control(SERVER_CONTROL_ACTION_ROLLBACK, pending_mark)) {
+                at_home = false; // it is kept as it was when the slot took it
+            } else {
+                if (audio_open) {
+                    load_turn(pending_before);
+                }
+                std::lock_guard<std::mutex> lock(mutex);
+                own_ctx.ids  = ids_of(items);
+                own_ctx.turn = save_turn();
+            }
+            held = take_audio();
+        }
+        restore_session();
+        at_home   = false;
+        own_whole = false;
+        if (held.open && put_stale()) {
+            reopen_audio(std::move(held));
+        }
+    }
+
+    void restore_session() {
         if (snap_restore) {
             snap_restore    = false;
             pending_restore = false;
@@ -2438,21 +2502,19 @@ struct realtime_conversation {
             }
         }
 
-        saved_instructions = instructions;
-        saved_tools        = tools;
-        saved_tools_json   = tools_json;
-        instructions = instr;
-        tools        = new_tools;
-        tools_json   = new_tools_json;
-        if (!configure()) {
-            instructions = saved_instructions;
-            tools        = saved_tools;
-            tools_json   = saved_tools_json;
+        own_whole = false;
+        if (!swap_context(instr, new_tools, new_tools_json)) {
             send_error("the chat template does not fit the realtime turn format", "server_error");
             return false;
         }
         if (!has_input) {
-            return put_cached_context(ctx_items);
+            if (!put_cached_context(ctx_items)) {
+                return false;
+            }
+            // a response needs a user turn or tool results before it; with an empty user turn the context is not
+            // the conversation as it is
+            own_whole = turn_open || tool_results || system_last;
+            return own_whole || ensure_turn();
         }
         // the own context starts with its own instructions and tools: nothing of the conversation stays in the slot
         // (the mark of the first item is after the session prompt if the conversation starts with a response)
@@ -2514,11 +2576,89 @@ struct realtime_conversation {
         own_ctx.ids  = ids;
         own_ctx.turn = save_turn();
         own_end_mark = "own" + std::to_string(n_marks++);
-        if (!control(SERVER_CONTROL_ACTION_MARK, own_end_mark)) {
+        return control(SERVER_CONTROL_ACTION_MARK, own_end_mark);
+    }
+
+    // the instructions and tools of an own context, the session's wait in saved_*; false: the chat template does not
+    // fit them, the session's stay
+    bool swap_context(const std::string & instr, const std::vector<common_chat_tool> & new_tools, const json & new_tools_json) {
+        saved_instructions = instructions;
+        saved_tools        = tools;
+        saved_tools_json   = tools_json;
+        instructions = instr;
+        tools        = new_tools;
+        tools_json   = new_tools_json;
+        if (configure()) {
+            return true;
+        }
+        instructions = saved_instructions;
+        tools        = saved_tools;
+        tools_json   = saved_tools_json;
+        return false;
+    }
+
+    // the session is idle in its own context and the next audio is expected to be answered in another one
+    bool away_from_home() const {
+        return type == "realtime" && !home.key.empty() && !pending_restore && !responding && !audio_open && !ctx_lost &&
+               home.key != context_key();
+    }
+
+    // the slot takes the home context: its snapshot and the items it lacks, or all of it
+    void go_home() {
+        std::vector<conv_item> ctx_items;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            ctx_items = items;
+        }
+        // the transcriptions on other slots wait, as for a response
+        const bool was_hot = hot;
+        set_hot(true);
+        own_whole = false;
+        if (!swap_context(home.instructions, home.tools, home.tools_json)) {
+            home = {};
+        } else if (put_cached_context(ctx_items)) {
+            at_home = true;
+        } else {
+            home = {};
+            if (pending_restore) {
+                restore_conversation();
+            } else {
+                instructions = saved_instructions;
+                tools        = saved_tools;
+                tools_json   = saved_tools_json;
+                configure();
+            }
+        }
+        if (!was_hot) {
+            set_hot(false);
+        }
+    }
+
+    // at home: the response asks for the home context over the conversation
+    bool response_at_home(const json & resp) const {
+        if (resp.contains("input") && resp["input"].is_array()) {
             return false;
         }
-        // a response needs a user turn or tool results before it
-        return turn_open || tool_results || system_last || ensure_turn();
+        const std::string instr = resp.contains("instructions") && resp["instructions"].is_string() ?
+                                  resp["instructions"].get<std::string>() : saved_instructions;
+        return context_key(instr, resp.contains("tools") ? resp["tools"] : saved_tools_json) == home.key;
+    }
+
+    // the client events that run in the home context: audio goes into it, a response is checked when it starts
+    // (response_at_home), the others do not touch the slot
+    static bool home_event(const std::string & t) {
+        return t == "input_audio_buffer.append" || t == "input_audio_buffer.commit" || t == "input_audio_buffer.clear" ||
+               t == "conversation.item.retrieve" || t == "response.create" || t == "response.cancel";
+    }
+
+    // a tool call or its result is the last item: the response that goes on is about to come, the session is not idle
+    bool awaits_response() {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (items.empty()) {
+            return false;
+        }
+        const std::string last = json_value(items.back().item, "type", std::string());
+        return last == "function_call" || last == "function_call_output";
     }
 
     // from the start of a response to its end (with its speech) the transcriptions on other slots wait, they share the GPU
@@ -2528,6 +2668,7 @@ struct realtime_conversation {
         }
         deps.n_hot += on ? 1 : -1;
         if (!on) {
+            t_active = ggml_time_us();
             // the slots that waited have work again
             server_task task(SERVER_TASK_TYPE_NEXT_RESPONSE);
             task.id = deps.queue_tasks.get_new_id();
@@ -2575,6 +2716,11 @@ struct realtime_conversation {
             return false;
         }
         const bool oob = conversation == "none";
+
+        // the slot is at home and the response asks for another context: it starts from the session context
+        if (at_home && !response_at_home(resp)) {
+            restore_conversation();
+        }
 
         // input, instructions or tools of the response: it gets its own context
         std::string resp_instructions = instructions;
@@ -2645,12 +2791,24 @@ struct realtime_conversation {
             put_conversation();
             reopen_audio(std::move(held));
         }
+        // the next audio is expected to be answered as this one is
+        if (audio_turn && !has_input) {
+            if (fresh) {
+                home = {context_key(resp_instructions, resp_tools_json), resp_instructions, resp_tools, resp_tools_json};
+            } else if (!at_home) {
+                home = {};
+            }
+        }
+        audio_turn = false;
         // a response with its own context over the conversation takes the items as they are, see put_cached_context()
         if ((!fresh || has_input) && !put_stale()) {
             return false;
         }
         if (fresh && !put_response_context(resp, has_input, resp_instructions, resp_tools, resp_tools_json)) {
             return false;
+        }
+        if (oob) {
+            own_whole = false; // its items do not join the conversation
         }
         // an empty conversation: the assistant speaks first, after an empty user turn
         if (at_start() && !ensure_turn()) {
@@ -3012,18 +3170,35 @@ struct realtime_conversation {
                 return;
             }
             if (!responding) {
-                set_hot(true);
-                restore_conversation();
-                run_held();
-                if (!responding) {
-                    set_hot(false);
+                // a response in the home context left it as the conversation is: the slot stays there
+                if (own_whole && !home.key.empty() && own_ctx.key == home.key) {
+                    at_home = true;
+                }
+                own_whole = false;
+                if (at_home && home_event(t)) {
+                    if (!held_events.empty()) {
+                        run_held();
+                        handle(msg); // a held event may have left home or started a response
+                        return;
+                    }
+                } else {
+                    set_hot(true);
+                    restore_conversation();
+                    run_held();
+                    if (!responding) {
+                        set_hot(false);
+                    }
                 }
             }
         }
-        // the items that left the slot go in again when it is needed, or with the audio after other events (idle time);
-        // deletes, tool outputs and a response with its own context leave the slot as it is
+        // idle time (audio after audio, no tool call open): the slot goes home, or the items that left it go in again;
+        // they also go in when the slot is needed. Deletes, tool outputs and a response with its own context leave the
+        // slot as it is
         const bool append = t == "input_audio_buffer.append";
-        if (append ? last_append : t != "conversation.item.delete" && t != "response.create" && t != "conversation.item.create") {
+        const bool idle   = append && last_append && !awaits_response();
+        if (idle && away_from_home()) {
+            go_home();
+        } else if (append ? idle : t != "conversation.item.delete" && t != "response.create" && t != "conversation.item.create") {
             put_stale();
         }
         last_append = append;
@@ -3552,6 +3727,9 @@ struct realtime_conversation {
         }
         own_ctx      = {};
         session_snap = {};
+        home         = {}; // a context that failed is not taken again on its own
+        at_home      = false;
+        own_whole    = false;
         control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, "session");
         for (const auto & snap : snapshots) {
             control(SERVER_CONTROL_ACTION_SNAPSHOT_DROP, snap.name);
